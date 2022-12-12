@@ -9,7 +9,7 @@ import uuid
 
 fairytaleqa_path_questions = '../../data/FairyTaleQA_Dataset/split_for_training/'
 headers_stories= ['section_id', 'section_text']
-headers_questions = ['question_id', 'local-or-sum', 'section_id', 'attribute1', 'attribute2', 'question', 'ex-or-im1', 'answer1', 'answer2', 'answer3', 'ex-or-im2', 'answer4', 'answer5', 'answer6']
+#headers_questions = ['question_id', 'local-or-sum', 'section_id', 'attribute1', 'attribute2', 'question', 'ex-or-im1', 'answer1', 'answer2', 'answer3', 'ex-or-im2', 'answer4', 'answer5', 'answer6']
 
 def get_files_names(path_questions):
     # https://stackoverflow.com/questions/3207219/how-do-i-list-all-files-of-a-directory
@@ -58,23 +58,57 @@ def get_story_sections(file_path_story):
 
     return story_sections
 
+def merge_attributes(story_sections):
+    possible_attributes = ['character','setting','action','feeling','causal relationship','outcome resolution','prediction']
+    attributes = []
+    for row in story_sections:
+        if row['attribute1'] in possible_attributes:
+            attributes.append(row['attribute1'])
+        else:
+            print("error! attribute1 is not identified!")
+            sys.exit()
+        if row['attribute2'] in possible_attributes:
+            attributes.append(row['attribute2'])
+
+        # replace attributes name's spaces with '_'
+        for idx, att in enumerate(attributes):
+            if att == 'causal relationship':
+                attributes[idx] = 'causal_relationship'
+            if att == 'outcome resolution':
+                attributes[idx] = 'outcome_resolution'
+
+        row['attributes'] = attributes
+        attributes = []
+    
+    return story_sections
+
+def change_headers_names(headers_questions):
+    for idx, header in enumerate(headers_questions):
+        if header == 'cor_section':
+            headers_questions[idx] = 'section_id'
+    return headers_questions
+
 def get_story_questions(file_path_questions):
     # convert xxx-questions.csv to list of lists
     with open(file_path_questions) as fp:
         reader = csv.reader(fp, delimiter=",")
-        next(reader, None)  # skip the headers
+        #next(reader, None)  # skip the headers
         story_questions = [row for row in reader]
+    
+    # (bug) must take headers manually because some files change column order (e.g., the-enchanted-moccasins-questions.csv)
+    headers_questions = change_headers_names(story_questions[0])
+    story_questions.pop(0)
 
     # delete last 'comments' column from 2 stories (it is a bug from fairytaleqa)
-    for index, row in enumerate(story_questions):
+    for row in story_questions:
         if len(row) > 14:
             del row[-1]
 
     story_questions = [dict(zip(headers_questions, l)) for l in story_questions]
-    
+
     return story_questions
 
-def merge_questions_sections(story_sections, story_questions):
+def merge_questions_sections(file_name_story, story_sections, story_questions):
     # add section stories to story_questions
     for index, question_story in enumerate(story_questions):
         #assign unique id to question
@@ -85,6 +119,7 @@ def merge_questions_sections(story_sections, story_questions):
         # https://stackoverflow.com/questions/7368789/convert-all-strings-in-a-list-to-int
         section_ids_int = list(map(int, section_ids_str))
         
+        # merge questions with sections
         sections_uuids, sections_texts = [],[]
         for section_id in section_ids_int:
             section_story = next(item for item in story_sections if item['section_id'] == section_id)
@@ -94,6 +129,8 @@ def merge_questions_sections(story_sections, story_questions):
         # assign new columns 'sections_uuids' and 'sections_texts'
         question_story['sections_uuids'] = sections_uuids
         question_story['sections_texts'] = sections_texts
+        # assign new column 'story_name'
+        question_story['story_name'] = file_name_story
     
     return story_questions
 
@@ -116,8 +153,11 @@ def get_dataset(dataset_split):
         story_sections = get_story_sections(file_path_story)
         story_questions = get_story_questions(file_path_questions)
 
+        # merge attributes 1 and 2
+        story_questions = merge_attributes(story_questions)
+
         # merget story_sections and story_questions in one final dataset
-        merged_questions_sections = merge_questions_sections(story_sections, story_questions)
+        merged_questions_sections = merge_questions_sections(file_name_story, story_sections, story_questions)
 
         faitytaleqa.extend(merged_questions_sections)
 
@@ -132,7 +172,12 @@ def run():
 
 if __name__ == '__main__':
     fairytaleqa_train, fairytaleqa_val, fairytaleqa_test  = run()
-    print(len(fairytaleqa_test))
+
+    for elem in fairytaleqa_test:
+        print(elem)
+        print("\n\n\n")
+    
+    sys.exit()
 
 # https://stackoverflow.com/questions/43175382/python-create-a-pandas-data-frame-from-a-list
 #df_questions = pd.DataFrame(all_list_questions, columns = headers)
