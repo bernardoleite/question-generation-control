@@ -58,7 +58,7 @@ def get_story_sections(file_path_story):
 
     return story_sections
 
-def merge_attributes(story_sections):
+def merge_questions_attributes(story_sections):
     possible_attributes = ['character','setting','action','feeling','causal relationship','outcome resolution','prediction']
     attributes = []
     for row in story_sections:
@@ -156,7 +156,7 @@ def get_dataset(dataset_split):
         story_questions = get_story_questions(file_path_questions)
 
         # merge attributes 1 and 2 (if exists)
-        story_questions = merge_attributes(story_questions)
+        story_questions = merge_questions_attributes(story_questions)
 
         # merge story_sections and story_questions in one final dataset
         merged_questions_sections = merge_questions_sections(file_name_story, story_sections, story_questions)
@@ -168,7 +168,7 @@ def get_dataset(dataset_split):
 def run():
     fairytaleqa_train = get_dataset("train")
     fairytaleqa_val = get_dataset("val") 
-    fairytaleqa_test = get_dataset("test") 
+    fairytaleqa_test = get_dataset("test")
 
     return fairytaleqa_train, fairytaleqa_val, fairytaleqa_test
 
@@ -189,7 +189,8 @@ if __name__ == '__main__':
     with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_test.json', 'w', encoding='utf-8') as fout:
         json.dump(fairytaleqa_test , fout)
 
-    #with open('fairytaleqa_test.json', "r", encoding='utf-8') as read_file:
+    # read data
+    #with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_test.json', "r", encoding='utf-8') as read_file:
         #data = json.load(read_file)
 
 # https://stackoverflow.com/questions/43175382/python-create-a-pandas-data-frame-from-a-list
