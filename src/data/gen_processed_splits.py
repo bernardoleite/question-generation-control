@@ -35,7 +35,7 @@ def get_files_names(path_questions):
 
 def get_story_sections(file_path_story):
     # convert xxx-story.csv to list of lists -> [ ['section1','text1'], ['section2','text2'], ... ]
-    with open(file_path_story) as fp:
+    with open(file_path_story, encoding="utf8") as fp:
         reader = csv.reader(fp, delimiter=",")
         next(reader, None)  # skip the headers
         story_sections = [row for row in reader]
@@ -86,11 +86,13 @@ def change_headers_names(headers_questions):
     for idx, header in enumerate(headers_questions):
         if header == 'cor_section':
             headers_questions[idx] = 'section_id'
+        if header == 'question':
+            headers_questions[idx] = 'question_reference'
     return headers_questions
 
 def get_story_questions(file_path_questions):
     # convert xxx-questions.csv to list of lists
-    with open(file_path_questions) as fp:
+    with open(file_path_questions, encoding="utf8") as fp:
         reader = csv.reader(fp, delimiter=",")
         #next(reader, None)  # skip the headers
         story_questions = [row for row in reader]
@@ -153,10 +155,10 @@ def get_dataset(dataset_split):
         story_sections = get_story_sections(file_path_story)
         story_questions = get_story_questions(file_path_questions)
 
-        # merge attributes 1 and 2
+        # merge attributes 1 and 2 (if exists)
         story_questions = merge_attributes(story_questions)
 
-        # merget story_sections and story_questions in one final dataset
+        # merge story_sections and story_questions in one final dataset
         merged_questions_sections = merge_questions_sections(file_name_story, story_sections, story_questions)
 
         faitytaleqa.extend(merged_questions_sections)
@@ -173,11 +175,22 @@ def run():
 if __name__ == '__main__':
     fairytaleqa_train, fairytaleqa_val, fairytaleqa_test  = run()
 
-    for elem in fairytaleqa_test:
-        print(elem)
-        print("\n\n\n")
+    # https://stackoverflow.com/questions/273192/how-can-i-safely-create-a-nested-directory
+    from pathlib import Path
+    Path('../../data/FairyTaleQA_Dataset/processed').mkdir(parents=True, exist_ok=True)
     
-    sys.exit()
+    # save faitytaleqa processed splits to json files
+    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_train.json', 'w', encoding='utf-8') as fout:
+        json.dump(fairytaleqa_train , fout)
+
+    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_val.json', 'w', encoding='utf-8') as fout:
+        json.dump(fairytaleqa_val , fout)
+
+    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_test.json', 'w', encoding='utf-8') as fout:
+        json.dump(fairytaleqa_test , fout)
+
+    #with open('fairytaleqa_test.json', "r", encoding='utf-8') as read_file:
+        #data = json.load(read_file)
 
 # https://stackoverflow.com/questions/43175382/python-create-a-pandas-data-frame-from-a-list
 #df_questions = pd.DataFrame(all_list_questions, columns = headers)
