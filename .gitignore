@@ -1,3 +1,5 @@
+predictions
+checkpoints
 data/FairyTaleQA_Dataset
 data/FairyTaleQA_Dataset_Sentence_Split
 .DS_Store

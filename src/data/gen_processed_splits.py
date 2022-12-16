@@ -73,9 +73,9 @@ def merge_questions_attributes(story_sections):
         # replace attributes name's spaces with '_'
         for idx, att in enumerate(attributes):
             if att == 'causal relationship':
-                attributes[idx] = 'causal_relationship'
+                attributes[idx] = 'causal'
             if att == 'outcome resolution':
-                attributes[idx] = 'outcome_resolution'
+                attributes[idx] = 'outcome'
 
         row['attributes'] = attributes
         attributes = []
