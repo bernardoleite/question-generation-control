@@ -16,11 +16,12 @@ import os
 import json
 import torch
 
-def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer,  answer: str, context: str) -> str:
+def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer, skill: str,  answer: str, context: str) -> str:
+
+    input_concat = '<skill>' + skill + '</skill>' + '<boa>' + answer + '</boa>' + '<bot>' + context + '</bot>'
 
     source_encoding = tokenizer(
-        answer,
-        context,
+        input_concat,
         max_length=args.max_len_input,
         padding='max_length',
         truncation = 'only_second',
@@ -67,7 +68,7 @@ def run(args):
     params_dict = dict(
         checkpoint_model_path = args.checkpoint_model_path,
         predictions_save_path = args.predictions_save_path,
-        test_df_path = args.test_df_path,
+        test_path = args.test_path,
         model_name = args.model_name,
         tokenizer_name = args.tokenizer_name,
         batch_size = args.batch_size,
@@ -83,6 +84,7 @@ def run(args):
 
     # Load T5 base Tokenizer
     t5_tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_name)
+    t5_tokenizer.add_tokens(['<skill>','</skill>','<boa>','</boa>','<bot>','</bot>'], special_tokens=True)
     # Load T5 base Model
     if "mt5" in args.model_name:
         t5_model = MT5ForConditionalGeneration.from_pretrained(args.model_name)
@@ -98,8 +100,10 @@ def run(args):
     qgmodel.eval()
 
     # Read test data
-    test_df = pd.read_pickle(args.test_df_path)
-    test_df = test_df.sample(n=20) # to DELETEEEEEE !!!!!!!!!!!!!!
+    with open(args.test_path, "r", encoding='utf-8') as read_file:
+        test_list = json.load(read_file)
+    #test_list = pd.read_pickle(args.test_path)
+    #test_list = test_list.sample(n=20) # to DELETEEEEEE !!!!!!!!!!!!!!
 
     predictions = []
 
@@ -111,13 +115,13 @@ def run(args):
     # Generate questions and append predictions
     start_time_generate = time.time()
     printcounter = 0
-    for index, row in test_df.iterrows():
-        generated = generate(args, device, qgmodel, t5_tokenizer, row['answer'], row['context'])
+    for index, row in enumerate(test_list):
+        generated = generate(args, device, qgmodel, t5_tokenizer, row['attributes'][0], row['answer1'], ' '.join(row['sections_texts']))
 
         predictions.append(
-            {'context': row['context'],
-            'gt_question': row['question'],
-            'answer': row['answer'],
+            {'sections_texts': ' '.join(row['sections_texts']),
+            'gt_question': row['question_reference'],
+            'answer': row['answer1'],
             'gen_question': generated} # to change !!!!!!!! what?
         )
         printcounter += 1
@@ -159,16 +163,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Generate questions and save them to json file.')
 
     # Add arguments
-    parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qg_br_ptt5_base_512_96_32_6_seed_42/model-epoch=03-val_loss=1.68.ckpt", required=False, help='Model folder checkpoint path.')
-    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qg_br_ptt5_base_512_96_32_6_seed_42/model-epoch=03-val_loss=1.68/", required=False, help='Folder path to save predictions after inference.')
-    parser.add_argument('-tp','--test_df_path', type=str, metavar='', default="../../data/squad_br_v2/dataframe/df_test_br.pkl", required=False, help='Test dataframe path.')
+    parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qg_t5_small_512_64_8_6_skills_seed_42/model-epoch=03-val_loss=1.22.ckpt", required=False, help='Model folder checkpoint path.')
+    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qg_t5_small_512_64_8_6_skills_seed_42/model-epoch=03-val_loss=1.22/", required=False, help='Folder path to save predictions after inference.')
+    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed/fairytaleqa_test.json", required=False, help='Test dataframe path.')
 
-    parser.add_argument('-mn','--model_name', type=str, metavar='', default="unicamp-dl/ptt5-base-portuguese-vocab", required=False, help='Model name.')
-    parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="unicamp-dl/ptt5-base-portuguese-vocab", required=False, help='Tokenizer name.')
+    parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
+    parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')
 
-    parser.add_argument('-bs','--batch_size', type=int, metavar='', default=32, required=False, help='Batch size.')
+    parser.add_argument('-bs','--batch_size', type=int, metavar='', default=8, required=False, help='Batch size.')
     parser.add_argument('-mli','--max_len_input', type=int, metavar='', default=512, required=False, help='Max len input for encoding.')
-    parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=96, required=False, help='Max len output for encoding.')
+    parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=64, required=False, help='Max len output for encoding.')
 
     parser.add_argument('-nb','--num_beams', type=int, metavar='', default=5, required=False, help='Number of beams.')
     parser.add_argument('-nrs','--num_return_sequences', type=int, metavar='', default=1, required=False, help='Number of returned sequences.')

@@ -34,7 +34,7 @@ def get_corpus_bleu(references, predictions, lower_case=True, language="english"
 
     return {"Bleu_1": bleu_1, "Bleu_2": bleu_2, "Bleu_3": bleu_3, "Bleu_4": bleu_4}
 
-def get_rouge_option_1(references, predictions, lower_case=True, language="english"):
+def get_rouge_option_json(references, predictions, lower_case=False, language="english"):
     list_of_references = []
     hypotheses = []
 
@@ -73,7 +73,7 @@ def get_rouge_option_1(references, predictions, lower_case=True, language="engli
     
     return {"r": mean(all_rougeL_r), "p": mean(all_rougeL_p), "f": mean(all_rougeL_f)}
 
-def get_rouge_option_2(path_predictions, path_references):
+def get_rouge_option_text(path_predictions, path_references):
     files_rouge = FilesRouge()
     scores_files_rouge = files_rouge.get_scores(path_predictions, path_references, avg=True)
     return scores_files_rouge
@@ -114,9 +114,7 @@ def print_bleu_stats(preds, method, lower_case=True, language="portuguese"):
         new_preds = sorted(preds, key=lambda d: d['bleu_4']) 
     else:
         new_preds = sorted(preds, key=lambda d: d['bleu_4']) 
-    
-    for pred in new_preds:
-        print(pred,"\n")
+
 
     return 1
 
@@ -129,30 +127,26 @@ def run(args):
     predictions = [pred['gen_question'] for pred in references_predictions]
 
     # Get BLEU (results are the same as reported from Du et. al (2017))
-    score_corpus_bleu = get_corpus_bleu(references, predictions, lower_case=True, language=args.language)
-    print("Score Corpus Bleu: ", score_corpus_bleu)
-
-    result = print_bleu_stats(references_predictions, method="high", lower_case=True, language=args.language)
-
-    # Get BLEU (results are the same as reported from Du et. al (2017))
     score_corpus_bleu = get_corpus_bleu(references, predictions, lower_case=False, language=args.language)
     print("Score Corpus Bleu: ", score_corpus_bleu)
 
+    #result = print_bleu_stats(references_predictions, method="high", lower_case=True, language=args.language)
+
     # Get ROUGE Option 1
-    mean_rouge_scores = get_rouge_option_1(references, predictions, lower_case=True, language=args.language)
+    mean_rouge_scores = get_rouge_option_json(references, predictions, lower_case=True, language=args.language)
     print("Mean RougeL Scores: ", mean_rouge_scores)
 
     # Get ROUGE Option 2
-    rouge_files = get_rouge_option_2(args.predictions_path + "gen_questions.txt", args.predictions_path + "gt_questions.txt")
-    print("RougeL Files Score: ", rouge_files['rouge-l'])
+    #rouge_files = get_rouge_option_text(args.predictions_path + "gen_questions.txt", args.predictions_path + "gt_questions.txt")
+    #print("RougeL Files Score: ", rouge_files['rouge-l'])
 
 if __name__ == '__main__':
     # Initialize the Parser
     parser = argparse.ArgumentParser(description = 'Generate questions and save them to json file.')
 
     # Add arguments
-    parser.add_argument('-pp','--predictions_path', type=str, metavar='', default="../predictions/br_v2/", required=True, help='Predictions path.')
-    parser.add_argument('-lg','--language', type=str, metavar='', default="portuguese", required=True, help='Language for tokenize.')
+    parser.add_argument('-pp','--predictions_path', type=str, metavar='', default="../predictions/qg_t5_small_512_64_8_6_skills_seed_42/model-epoch=03-val_loss=1.22/", required=False, help='Predictions path.')
+    parser.add_argument('-lg','--language', type=str, metavar='', default="english", required=False, help='Language for tokenize.')
 
     # Parse arguments
     args = parser.parse_args()

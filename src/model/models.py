@@ -80,19 +80,3 @@ class T5FineTuner(pl.LightningModule):
         else:
             optimizer = AdamW(self.parameters(), lr=self.args.learning_rate, eps=self.args.epsilon)
         return optimizer
-
-    # for experimental purposes
-"""     def configure_optimizers(self):
-        if self.args.optimizer == 'AdamW':
-            optimizer = AdamW(self.parameters(), lr=self.args.learning_rate, eps=self.args.epsilon)
-            scheduler = {
-                'scheduler': optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.00001, steps_per_epoch=2698, epochs=20, pct_start=0.3),
-                'interval': 'step',
-            }
-        else:
-            optimizer = AdamW(self.parameters(), lr=self.args.learning_rate, eps=self.args.epsilon)
-            scheduler = {
-                'scheduler': optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.00001, steps_per_epoch=2698, epochs=20, pct_start=0.3),
-                'interval': 'step',
-            }
-        return [optimizer], [scheduler] """

@@ -18,7 +18,6 @@ sys.path.append('../')
 from utils import currentdate
 
 import copy
-import pandas as pd
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -48,23 +47,23 @@ class QGDataModule(pl.LightningDataModule):
         self,
         params,
         tokenizer: T5Tokenizer,
-        train_df: pd.DataFrame,
-        val_df: pd.DataFrame,
-        test_df: pd.DataFrame
+        train_list: list,
+        val_list: list,
+        test_list: list
         ): 
         super().__init__()
         self.tokenizer = tokenizer
-        self.train_df = train_df
-        self.val_df = val_df
-        self.test_df = test_df
+        self.train_list = train_list
+        self.val_list = val_list
+        self.test_list = test_list
         self.batch_size = params.batch_size
         self.max_len_input = params.max_len_input
         self.max_len_output = params.max_len_output
 
     def setup(self):
-        self.train_dataset = QGDataset(self.train_df, self.tokenizer, self.max_len_input, self.max_len_output)
-        self.validation_dataset = QGDataset(self.val_df, self.tokenizer, self.max_len_input, self.max_len_output)
-        self.test_dataset = QGDataset(self.test_df, self.tokenizer, self.max_len_input, self.max_len_output)
+        self.train_dataset = QGDataset(self.train_list, self.tokenizer, self.max_len_input, self.max_len_output)
+        self.validation_dataset = QGDataset(self.val_list, self.tokenizer, self.max_len_input, self.max_len_output)
+        self.test_dataset = QGDataset(self.test_list, self.tokenizer, self.max_len_input, self.max_len_output)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size = self.batch_size, shuffle=True, num_workers = 4) # why 4?
@@ -78,7 +77,7 @@ class QGDataModule(pl.LightningDataModule):
 class QGDataset(Dataset):
     def __init__(
         self,
-        data: pd.DataFrame,
+        data: list,
         tokenizer: T5Tokenizer,
         max_len_input: int,
         max_len_output: int
@@ -93,13 +92,15 @@ class QGDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, index: int):
-        data_row = self.data.iloc[index]
+        #data_row = self.data.iloc[index]
+        data_row = self.data[index]
+
+        input_concat = '<skill>' + data_row['attributes'][0] + '</skill>' + '<boa>' + data_row['answer1'] + '</boa>' + '<bot>' + ' '.join(data_row['sections_texts']) + '</bot>'
 
         # tokenize inputs
         source_encoding = self.tokenizer(
-            data_row['answer'],
-            data_row['context'],
-            truncation = 'only_second',
+            input_concat,
+            truncation = True,
             add_special_tokens=True,
             return_overflowing_tokens = True, # if (source_encoding.num_truncated_tokens.item() > 0): !!!!!!!! (future)
             max_length=self.max_len_input, 
@@ -108,7 +109,7 @@ class QGDataset(Dataset):
         )
         # tokenize targets
         target_encoding = self.tokenizer(
-            data_row['question'], 
+            data_row['question_reference'], 
             truncation = True,
             add_special_tokens=True,
             max_length=self.max_len_output, 
@@ -134,75 +135,13 @@ class QGDataset(Dataset):
             labels=labels.flatten()
         )
 
-# Prepare Dataset Structure
-class QuestionGenerationDataset(Dataset):
-    def __init__(self, filepath, tokenizer, max_len_inp=64, max_len_out=96):
-        self.path = filepath
-
-        self.passage_column = "context"
-        self.answer = "answer"
-        self.question = "question"
-
-        self.data = pd.read_csv(self.path)
-
-        self.max_len_input = max_len_inp
-        self.max_len_output = max_len_out
-        self.tokenizer = tokenizer
-        self.inputs = []
-        self.targets = []
-        self.skippedcount =0
-        self._build()
-
-    def __len__(self):
-        return len(self.inputs)
-
-    def __getitem__(self, index):
-        source_ids = self.inputs[index]["input_ids"].squeeze()
-        target_ids = self.targets[index]["input_ids"].squeeze()
-
-        src_mask = self.inputs[index]["attention_mask"].squeeze()  # might need to squeeze
-        target_mask = self.targets[index]["attention_mask"].squeeze()  # might need to squeeze
-
-        labels = copy.deepcopy(target_ids)
-        labels [labels==0] = -100
-
-        return {"source_ids": source_ids, "source_mask": src_mask, "target_ids": target_ids, "target_mask": target_mask, "labels":labels}
-
-    def _build(self):
-        for idx in tqdm(range(len(self.data))):
-            passage,answer,target = self.data.loc[idx, self.passage_column],self.data.loc[idx, self.answer], self.data.loc[idx, self.question]
-
-            #input_ = "context: %s  answer: %s </s>" % (passage, answer) ---> is this an alternative?
-            #target = "question: %s </s>" % (str(target)) ---> is this an alternative?
-
-            # tokenize inputs
-            tokenized_inputs = self.tokenizer(
-                answer,
-                passage,
-                truncation = 'only_second',
-                add_special_tokens=True,
-                max_length=self.max_len_input, 
-                padding='max_length', 
-                return_tensors="pt"
-            )
-            # tokenize targets
-            tokenized_targets = self.tokenizer(
-                target, 
-                truncation = True,
-                add_special_tokens=True,
-                max_length=self.max_len_output, 
-                padding='max_length',
-                return_tensors="pt"
-            )
-
-            self.inputs.append(tokenized_inputs)
-            self.targets.append(tokenized_targets)
-
 def run(args):
     pl.seed_everything(args.seed_value)
 
     # Load Tokenizer
     t5_tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_name)
+    t5_tokenizer.add_tokens(['<skill>','</skill>','<boa>','</boa>','<bot>','</bot>'], special_tokens=True)
+
     # Load model
     if "mt5" in args.model_name:
         t5_model = MT5ForConditionalGeneration.from_pretrained(args.model_name)
@@ -218,9 +157,9 @@ def run(args):
     params_dict = dict(
         model_name = args.model_name,
         tokenizer_name = args.tokenizer_name,
-        train_df_path = args.train_df_path,
-        validation_df_path = args.validation_df_path,
-        test_df_path = args.test_df_path,
+        train_path = args.train_path,
+        val_path = args.val_path,
+        test_path = args.test_path,
         max_len_input = args.max_len_input,
         max_len_output = args.max_len_output,
         max_epochs = args.max_epochs,
@@ -260,9 +199,13 @@ def run(args):
         logger = [tb_logger, csv_logger]
     ) #progress_bar_refresh_rate=30
 
-    train_df = pd.read_pickle(args.train_df_path)
-    validation_df = pd.read_pickle(args.validation_df_path)
-    test_df = pd.read_pickle(args.test_df_path)
+    # read data
+    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_train.json', "r", encoding='utf-8') as read_file:
+        train_list = json.load(read_file)
+    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_val.json', "r", encoding='utf-8') as read_file:
+        val_list = json.load(read_file)
+    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_test.json', "r", encoding='utf-8') as read_file:
+        test_list = json.load(read_file)
 
     # DELETE!!! JUST for FAST TESTING <----
     #####
@@ -271,7 +214,7 @@ def run(args):
     #test_df = pd.read_csv('../../data/squad_experiments/squad_v1_val.csv')
     #####
 
-    data_module = QGDataModule(params, t5_tokenizer, train_df, validation_df, test_df)
+    data_module = QGDataModule(params, t5_tokenizer, train_list, val_list, test_list)
     data_module.setup()
 
     start_time_train = time.time()
@@ -280,13 +223,6 @@ def run(args):
     trainer.test(ckpt_path="best", datamodule=data_module)
     #trainer.test(ckpt_path='best', dataloaders = data_module.test_dataloader)
     #trainer.test(ckpt_path=trainer.model_checkpoint.last_model_path)
-
-    # Only saves the last state model
-    #print ("Saving model")
-    #save_path_model = '../../model/'
-    #save_path_tokenizer = '../../tokenizer/'
-    #model.model.save_pretrained(save_path_model)
-    #t5_tokenizer.save_pretrained(save_path_tokenizer)
 
     end_time_train = time.time()
     train_total_time = end_time_train - start_time_train
@@ -297,19 +233,19 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Fine tune T5 for Question Generation.')
 
     # Add arguments
-    parser.add_argument('-dmn', '--dir_model_name', type=str, metavar='', default="qg_br_ptt5_base_512_96_32_6_seed_42", required=False, help='Directory model name.')
-    parser.add_argument('-mn','--model_name', type=str, metavar='', default="unicamp-dl/ptt5-base-portuguese-vocab", required=False, help='Model name.')
-    parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="unicamp-dl/ptt5-base-portuguese-vocab", required=False, help='Tokenizer name.')
+    parser.add_argument('-dmn', '--dir_model_name', type=str, metavar='', default="qg_t5_small_512_64_8_3_skills_seed_42", required=False, help='Directory model name.')
+    parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
+    parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')
 
-    parser.add_argument('-trp','--train_df_path', type=str, metavar='', default="../../data/squad_br_v2/dataframe/df_train_br.pkl", required=False, help='Train dataframe path.')
-    parser.add_argument('-vp','--validation_df_path', type=str, metavar='', default="../../data/squad_br_v2/dataframe/df_validation_br.pkl", required=False, help='Validation dataframe path.')
-    parser.add_argument('-tp','--test_df_path', type=str, metavar='', default="../../data/squad_br_v2/dataframe/df_test_br.pkl", required=False, help='Test dataframe path.')
+    parser.add_argument('-trp','--train_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed/fairytaleqa_train.json", required=False, help='Train path.')
+    parser.add_argument('-vp','--val_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed/fairytaleqa_val.json", required=False, help='Validation path.')
+    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed/fairytaleqa_test.json", required=False, help='Test path.')
 
     parser.add_argument('-mli','--max_len_input', type=int, metavar='', default=512, required=False, help='Max len input for encoding.')
-    parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=96, required=False, help='Max len output for encoding.')
+    parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=64, required=False, help='Max len output for encoding.')
 
     parser.add_argument('-me','--max_epochs', type=int, default=3, metavar='', required=False, help='Number of max Epochs')
-    parser.add_argument('-bs','--batch_size', type=int, default=32, metavar='', required=False, help='Batch size.')
+    parser.add_argument('-bs','--batch_size', type=int, default=8, metavar='', required=False, help='Batch size.')
     parser.add_argument('-ptc','--patience', type=int, default=3, metavar='', required=False, help='Patience') # it is not being used for now
     parser.add_argument('-o','--optimizer', type=str, default='AdamW', metavar='', required=False, help='Optimizer')
     parser.add_argument('-lr','--learning_rate', type=float, default=1e-4, metavar='', required=False, help='The learning rate to use.')
