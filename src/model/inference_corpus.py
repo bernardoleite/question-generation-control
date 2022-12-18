@@ -165,7 +165,7 @@ if __name__ == '__main__':
     # Add arguments
     parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qg_t5_small_512_64_8_6_skills_seed_42/model-epoch=03-val_loss=1.22.ckpt", required=False, help='Model folder checkpoint path.')
     parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qg_t5_small_512_64_8_6_skills_seed_42/model-epoch=03-val_loss=1.22/", required=False, help='Folder path to save predictions after inference.')
-    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed/fairytaleqa_test.json", required=False, help='Test dataframe path.')
+    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/fairytaleqa_test.json", required=False, help='Test dataframe path.')
 
     parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
     parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')

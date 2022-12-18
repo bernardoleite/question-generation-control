@@ -177,16 +177,16 @@ if __name__ == '__main__':
 
     # https://stackoverflow.com/questions/273192/how-can-i-safely-create-a-nested-directory
     from pathlib import Path
-    Path('../../data/FairyTaleQA_Dataset/processed').mkdir(parents=True, exist_ok=True)
+    Path('../../data/FairyTaleQA_Dataset/processed_gen').mkdir(parents=True, exist_ok=True)
     
     # save faitytaleqa processed splits to json files
-    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_train.json', 'w', encoding='utf-8') as fout:
+    with open('../../data/FairyTaleQA_Dataset/processed_gen/fairytaleqa_train.json', 'w', encoding='utf-8') as fout:
         json.dump(fairytaleqa_train , fout)
 
-    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_val.json', 'w', encoding='utf-8') as fout:
+    with open('../../data/FairyTaleQA_Dataset/processed_gen/fairytaleqa_val.json', 'w', encoding='utf-8') as fout:
         json.dump(fairytaleqa_val , fout)
 
-    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_test.json', 'w', encoding='utf-8') as fout:
+    with open('../../data/FairyTaleQA_Dataset/processed_gen/fairytaleqa_test.json', 'w', encoding='utf-8') as fout:
         json.dump(fairytaleqa_test , fout)
 
     # read data

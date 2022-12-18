@@ -200,11 +200,11 @@ def run(args):
     ) #progress_bar_refresh_rate=30
 
     # read data
-    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_train.json', "r", encoding='utf-8') as read_file:
+    with open(args.train_path, "r", encoding='utf-8') as read_file:
         train_list = json.load(read_file)
-    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_val.json', "r", encoding='utf-8') as read_file:
+    with open(args.val_path, "r", encoding='utf-8') as read_file:
         val_list = json.load(read_file)
-    with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_test.json', "r", encoding='utf-8') as read_file:
+    with open(args.test_path, "r", encoding='utf-8') as read_file:
         test_list = json.load(read_file)
 
     # DELETE!!! JUST for FAST TESTING <----
@@ -237,9 +237,9 @@ if __name__ == '__main__':
     parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
     parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')
 
-    parser.add_argument('-trp','--train_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed/fairytaleqa_train.json", required=False, help='Train path.')
-    parser.add_argument('-vp','--val_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed/fairytaleqa_val.json", required=False, help='Validation path.')
-    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed/fairytaleqa_test.json", required=False, help='Test path.')
+    parser.add_argument('-trp','--train_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/fairytaleqa_train.json", required=False, help='Train path.')
+    parser.add_argument('-vp','--val_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/fairytaleqa_val.json", required=False, help='Validation path.')
+    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/fairytaleqa_test.json", required=False, help='Test path.')
 
     parser.add_argument('-mli','--max_len_input', type=int, metavar='', default=512, required=False, help='Max len input for encoding.')
     parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=64, required=False, help='Max len output for encoding.')
