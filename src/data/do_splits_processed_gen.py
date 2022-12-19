@@ -58,6 +58,7 @@ def get_story_sections(file_path_story):
 
     return story_sections
 
+# include attribute information into queestions
 def merge_questions_attributes(story_sections):
     possible_attributes = ['character','setting','action','feeling','causal relationship','outcome resolution','prediction']
     attributes = []
@@ -180,14 +181,16 @@ if __name__ == '__main__':
     Path('../../data/FairyTaleQA_Dataset/processed_gen').mkdir(parents=True, exist_ok=True)
     
     # save faitytaleqa processed splits to json files
-    with open('../../data/FairyTaleQA_Dataset/processed_gen/fairytaleqa_train.json', 'w', encoding='utf-8') as fout:
+    with open('../../data/FairyTaleQA_Dataset/processed_gen/train.json', 'w', encoding='utf-8') as fout:
         json.dump(fairytaleqa_train , fout)
 
-    with open('../../data/FairyTaleQA_Dataset/processed_gen/fairytaleqa_val.json', 'w', encoding='utf-8') as fout:
+    with open('../../data/FairyTaleQA_Dataset/processed_gen/val.json', 'w', encoding='utf-8') as fout:
         json.dump(fairytaleqa_val , fout)
 
-    with open('../../data/FairyTaleQA_Dataset/processed_gen/fairytaleqa_test.json', 'w', encoding='utf-8') as fout:
+    with open('../../data/FairyTaleQA_Dataset/processed_gen/test.json', 'w', encoding='utf-8') as fout:
         json.dump(fairytaleqa_test , fout)
+    
+    print("GEN splits have been successfully created.")
 
     # read data
     #with open('../../data/FairyTaleQA_Dataset/processed/fairytaleqa_test.json', "r", encoding='utf-8') as read_file:

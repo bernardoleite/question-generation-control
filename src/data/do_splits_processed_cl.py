@@ -4,34 +4,16 @@ import json
 import sys
 import random
 
-def get_dataset_v2(split_gen):
-
-    all_sections_uuids_repeated = []
-    all_sections_uuids_unique = []
-    split_cl = []
-
-    for question in split_gen:
-        sections_uuids = question["sections_uuids"]
-        all_sections_uuids_repeated.extend(sections_uuids)
-
-    all_sections_uuids_unique = list(set(all_sections_uuids_repeated))
-    
-    for section_uuid in all_sections_uuids_unique:
-        new_dict = {"section_uuid": section_uuid}
-        for question in split_gen:
-            if section_uuid in question["sections_uuids"]:
-                split_cl.append()
-
-    return split_cl
-
 def get_dataset(split_gen):
 
     random.shuffle(split_gen)
     
     attributes_counter = {'character':0,'setting':0,'action':0,'feeling':0,'causal':0,'outcome':0,'prediction':0}
 
+    # array for saving new dataset
     split_ctrl = []
 
+    # format of each dict
     empy_elem = {
     "sections_uuids_concat": 'null', 
     "questions_reference": [],
@@ -40,6 +22,7 @@ def get_dataset(split_gen):
     "attribute": 'null'
     }
 
+    # append new element
     split_ctrl.append(empy_elem)
 
     for question in split_gen:
@@ -54,10 +37,12 @@ def get_dataset(split_gen):
         for elem in split_ctrl:
             if sections_uuids_concat == elem['sections_uuids_concat']:
                 sections_uuids_exists = 1
+                # append to current elem if it exists
                 if attribute == elem["attribute"]:
                     elem["questions_reference"].append(question_reference)
                     elem["answers_reference"].append(answer_reference)
         
+        # create new element if section uuid does not exist
         if sections_uuids_exists == 0:
             questions_reference = [question_reference]
             answers_reference = [answer_reference]
@@ -75,7 +60,6 @@ def get_dataset(split_gen):
     print(len(split_ctrl))
     print(attributes_counter)
     
-    sys.exit()
     return split_ctrl
 
 def run(train_gen, val_gen, test_gen):
@@ -89,12 +73,28 @@ def run(train_gen, val_gen, test_gen):
 
 if __name__ == '__main__':
 
-    # read data
-    with open("../../data/FairyTaleQA_Dataset/processed_gen/fairytaleqa_train.json", "r", encoding='utf-8') as read_file:
+    # read json data (processed_gen)
+    with open("../../data/FairyTaleQA_Dataset/processed_gen/train.json", "r", encoding='utf-8') as read_file:
         train_gen = json.load(read_file)
-    with open("../../data/FairyTaleQA_Dataset/processed_gen/fairytaleqa_val.json", "r", encoding='utf-8') as read_file:
+    with open("../../data/FairyTaleQA_Dataset/processed_gen/val.json", "r", encoding='utf-8') as read_file:
         val_gen = json.load(read_file)
-    with open("../../data/FairyTaleQA_Dataset/processed_gen/fairytaleqa_test.json", "r", encoding='utf-8') as read_file:
+    with open("../../data/FairyTaleQA_Dataset/processed_gen/test.json", "r", encoding='utf-8') as read_file:
         test_gen = json.load(read_file)
 
     train_cl, val_cl, test_cl  = run(train_gen, val_gen, test_gen)
+
+    # https://stackoverflow.com/questions/273192/how-can-i-safely-create-a-nested-directory
+    from pathlib import Path
+    Path('../../data/FairyTaleQA_Dataset/processed_cl').mkdir(parents=True, exist_ok=True)
+    
+    # save faitytaleqa processed splits to json files
+    with open('../../data/FairyTaleQA_Dataset/processed_cl/train.json', 'w', encoding='utf-8') as fout:
+        json.dump(train_cl , fout)
+
+    with open('../../data/FairyTaleQA_Dataset/processed_cl/val.json', 'w', encoding='utf-8') as fout:
+        json.dump(val_cl , fout)
+
+    with open('../../data/FairyTaleQA_Dataset/processed_cl/test.json', 'w', encoding='utf-8') as fout:
+        json.dump(test_cl , fout)
+
+    print("CL splits have been successfully created.")
