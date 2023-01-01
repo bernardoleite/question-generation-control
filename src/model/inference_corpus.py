@@ -11,14 +11,28 @@ sys.path.append('../')
 
 from models import T5FineTuner
 from utils import currentdate
+from utils import find_string_between_two_substring
 import time
 import os
 import json
 import torch
 
-def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer, skill: str,  answer: str, context: str) -> str:
+validation_global = 0
 
-    input_concat = '<skill>' + skill + '</skill>' + '<boa>' + answer + '</boa>' + '<bot>' + context + '</bot>'
+def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer, question: dict) -> str:
+
+    # enconding info
+    if args.encoder_info == "text":
+        input_concat = ' '.join(question['sections_texts'])
+    elif args.encoder_info == "answer_text":
+        input_concat = '<answer>' + question['answers_reference'][0] + '</answer>' + '<text>' + ' '.join(question['sections_texts']) + '</text>'
+    elif args.encoder_info == "skill_text":
+        input_concat = '<skill>' + question['target_attribute'] + '<text>' + ' '.join(question['sections_texts'])
+    elif args.encoder_info == "skill_answer_text":
+        input_concat = '<skill>' + question['attributes'][0] + '</skill>' + '<answer>' + question['answers_reference'][0] + '</answer>' + '<text>' + ' '.join(question['sections_texts']) + '</text>'
+    else:
+        print("Error with encoder_info.")
+        sys.exit()
 
     source_encoding = tokenizer(
         input_concat,
@@ -46,12 +60,38 @@ def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer, skill: 
         use_cache=True
     )
 
+    generated_question, generated_answer = '', ''
     preds = {
         tokenizer.decode(generated_id, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         for generated_id in generated_ids
     }
-    
-    return ''.join(preds)
+    if args.decoder_info == 'question':
+        generated_question = ''.join(preds)
+    elif args.decoder_info == 'question_answer':
+        generated_str = ''.join(preds)
+        validate_generated_str(generated_str)
+        if '<question>' in generated_str and '<answer>' in generated_str:
+            generated_question = find_string_between_two_substring(generated_str, '<question>', '<answer>')
+            generated_answer = find_string_between_two_substring(generated_str, '<answer>', '<END>')
+        else:
+            print("Error during inference: question_answer (1)!")
+            sys.exit()
+    else:
+        print("Error during inference: question_answer (2)!")
+        sys.exit()
+    return generated_question, generated_answer
+
+def validate_generated_str(str):
+    question_begin = str.count("<question>")
+    answer_begin = str.count("<answer>")
+    global validation_global
+
+    if question_begin == 1 and answer_begin == 1:
+        validation_global = validation_global + 1
+    else:
+        print(str,"\n")
+
+    return 1
 
 def show_result(generated: str, answer: str, context:str, original_question: str = ''):
     print('Generated: ', generated)
@@ -84,12 +124,18 @@ def run(args):
 
     # Load T5 base Tokenizer
     t5_tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_name)
-    t5_tokenizer.add_tokens(['<skill>','</skill>','<boa>','</boa>','<bot>','</bot>'], special_tokens=True)
+    t5_tokenizer.add_tokens(['<skill>','</skill>','<question>','</question>','<answer>','</answer>','<text>','</text>'], special_tokens=True)
+
     # Load T5 base Model
     if "mt5" in args.model_name:
         t5_model = MT5ForConditionalGeneration.from_pretrained(args.model_name)
     else:
         t5_model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+
+    # https://stackoverflow.com/questions/69191305/how-to-add-new-special-token-to-the-tokenizer
+    # https://discuss.huggingface.co/t/adding-new-tokens-while-preserving-tokenization-of-adjacent-tokens/12604
+    t5_model.resize_token_embeddings(len(t5_tokenizer))
+
     # Load T5 fine-tuned model for QG
     checkpoint_model_path = args.checkpoint_model_path
     qgmodel = T5FineTuner.load_from_checkpoint(checkpoint_model_path, hparams=params, t5model=t5_model, t5tokenizer=t5_tokenizer)
@@ -116,16 +162,19 @@ def run(args):
     start_time_generate = time.time()
     printcounter = 0
     for index, row in enumerate(test_list):
-        generated = generate(args, device, qgmodel, t5_tokenizer, row['attributes'][0], row['answer1'], ' '.join(row['sections_texts']))
-
+        gen_question, gen_answer = generate(args, device, qgmodel, t5_tokenizer, row)
         predictions.append(
-            {'sections_texts': ' '.join(row['sections_texts']),
-            'gt_question': row['question_reference'],
-            'answer': row['answer1'],
-            'gen_question': generated} # to change !!!!!!!! what?
+            {'sections_uuids': row['sections_uuids'],
+            'questions_reference': row['questions_reference'],
+            'answers_reference': row['answers_reference'],
+            'sections_texts': row['sections_texts'],
+            'attributes': row['attributes_per_question'],
+            'target_attribute': row['target_attribute'],
+            'gen_question': gen_question,
+            'gen_answer': gen_answer} 
         )
         printcounter += 1
-        if (printcounter == 400):
+        if (printcounter == 500):
             print(str(printcounter) + " questions have been generated.")
             printcounter = 0
         #show_result(generated, row['answer'], row['context'], row['question'])
@@ -136,6 +185,8 @@ def run(args):
     end_time_generate = time.time()
     gen_total_time = end_time_generate - start_time_generate
     print("Inference time: ", gen_total_time)
+
+    print("Nr. of RIGHT cases: ", validation_global)
 
     # Save questions and answers to json file
 
@@ -163,9 +214,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Generate questions and save them to json file.')
 
     # Add arguments
-    parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qg_t5_small_512_64_8_6_skills_seed_42/model-epoch=03-val_loss=1.22.ckpt", required=False, help='Model folder checkpoint path.')
-    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qg_t5_small_512_64_8_6_skills_seed_42/model-epoch=03-val_loss=1.22/", required=False, help='Folder path to save predictions after inference.')
-    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/fairytaleqa_test.json", required=False, help='Test dataframe path.')
+    parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qg_t5_small_512_64_8_10_skilltext_questionanswer_seed_42/model-epoch=04-val_loss=1.12.ckpt", required=False, help='Model folder checkpoint path.')
+    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qg_t5_small_512_64_8_10_skilltext_questionanswer_precl_predicted_seed_42/model-epoch=04-val_loss=1.12/", required=False, help='Folder path to save predictions after inference.')
+    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_precl_predicted/test.json", required=False, help='Test json path.')
 
     parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
     parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')
@@ -173,6 +224,9 @@ if __name__ == '__main__':
     parser.add_argument('-bs','--batch_size', type=int, metavar='', default=8, required=False, help='Batch size.')
     parser.add_argument('-mli','--max_len_input', type=int, metavar='', default=512, required=False, help='Max len input for encoding.')
     parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=64, required=False, help='Max len output for encoding.')
+
+    parser.add_argument('-enci','--encoder_info', type=str, metavar='', default="skill_text", required=False, help='Information for encoding.')
+    parser.add_argument('-deci','--decoder_info', type=str, metavar='', default="question_answer", required=False, help='Information for decoding (generation).')
 
     parser.add_argument('-nb','--num_beams', type=int, metavar='', default=5, required=False, help='Number of beams.')
     parser.add_argument('-nrs','--num_return_sequences', type=int, metavar='', default=1, required=False, help='Number of returned sequences.')
