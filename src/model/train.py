@@ -59,11 +59,13 @@ class QGDataModule(pl.LightningDataModule):
         self.batch_size = params.batch_size
         self.max_len_input = params.max_len_input
         self.max_len_output = params.max_len_output
+        self.encoder_info = params.encoder_info
+        self.decoder_info = params.decoder_info
 
     def setup(self):
-        self.train_dataset = QGDataset(self.train_list, self.tokenizer, self.max_len_input, self.max_len_output)
-        self.validation_dataset = QGDataset(self.val_list, self.tokenizer, self.max_len_input, self.max_len_output)
-        self.test_dataset = QGDataset(self.test_list, self.tokenizer, self.max_len_input, self.max_len_output)
+        self.train_dataset = QGDataset(self.train_list, self.tokenizer, self.max_len_input, self.max_len_output, self.encoder_info, self.decoder_info)
+        self.validation_dataset = QGDataset(self.val_list, self.tokenizer, self.max_len_input, self.max_len_output, self.encoder_info, self.decoder_info)
+        self.test_dataset = QGDataset(self.test_list, self.tokenizer, self.max_len_input, self.max_len_output, self.encoder_info, self.decoder_info)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size = self.batch_size, shuffle=True, num_workers = 4) # why 4?
@@ -80,13 +82,17 @@ class QGDataset(Dataset):
         data: list,
         tokenizer: T5Tokenizer,
         max_len_input: int,
-        max_len_output: int
+        max_len_output: int,
+        encoder_info: str,
+        decoder_info: str
         ):
 
         self.tokenizer = tokenizer
         self.data = data
         self.max_len_input = max_len_input
         self.max_len_output = max_len_output
+        self.encoder_info = encoder_info
+        self.decoder_info = decoder_info
 
     def __len__(self):
         return len(self.data)
@@ -95,7 +101,27 @@ class QGDataset(Dataset):
         #data_row = self.data.iloc[index]
         data_row = self.data[index]
 
-        input_concat = '<skill>' + data_row['attributes'][0] + '</skill>' + '<boa>' + data_row['answer1'] + '</boa>' + '<bot>' + ' '.join(data_row['sections_texts']) + '</bot>'
+        # enconding info
+        if self.encoder_info == "text":
+            input_concat = ' '.join(data_row['sections_texts'])
+        elif self.encoder_info == "answer_text":
+            input_concat = '<answer>' + data_row['answers_reference'][0] + '</answer>' + '<text>' + ' '.join(data_row['sections_texts']) + '</text>'
+        elif self.encoder_info == "skill_text":
+            input_concat = '<skill>' + data_row['attributes'][0] + '<text>' + ' '.join(data_row['sections_texts'])
+        elif self.encoder_info == "skill_answer_text":
+            input_concat = '<skill>' + data_row['attributes'][0] + '</skill>' + '<answer>' + data_row['answers_reference'][0] + '</answer>' + '<text>' + ' '.join(data_row['sections_texts']) + '</text>'
+        else:
+            print("Error with encoder_info.")
+            sys.exit()
+
+        # decoding info
+        if self.decoder_info == "question":
+            target_concat = data_row['questions_reference'][0]
+        elif self.decoder_info == "question_answer":
+            target_concat = '<question>' + data_row['questions_reference'][0] + '<answer>' + data_row['answers_reference'][0]
+        else:
+            print("Error with decoder_info.")
+            sys.exit()
 
         # tokenize inputs
         source_encoding = self.tokenizer(
@@ -109,7 +135,7 @@ class QGDataset(Dataset):
         )
         # tokenize targets
         target_encoding = self.tokenizer(
-            data_row['question_reference'], 
+            target_concat, 
             truncation = True,
             add_special_tokens=True,
             max_length=self.max_len_output, 
@@ -140,13 +166,17 @@ def run(args):
 
     # Load Tokenizer
     t5_tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_name)
-    t5_tokenizer.add_tokens(['<skill>','</skill>','<boa>','</boa>','<bot>','</bot>'], special_tokens=True)
+    t5_tokenizer.add_tokens(['<skill>','</skill>','<question>','</question>','<answer>','</answer>','<text>','</text>'], special_tokens=True)
 
     # Load model
     if "mt5" in args.model_name:
         t5_model = MT5ForConditionalGeneration.from_pretrained(args.model_name)
     else:
         t5_model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+
+    # https://stackoverflow.com/questions/69191305/how-to-add-new-special-token-to-the-tokenizer
+    # https://discuss.huggingface.co/t/adding-new-tokens-while-preserving-tokenization-of-adjacent-tokens/12604
+    t5_model.resize_token_embeddings(len(t5_tokenizer))
 
     # Checkpoints and Logs Paths
     CHECKPOINTS_PATH = '../../checkpoints/' + args.dir_model_name
@@ -162,6 +192,8 @@ def run(args):
         test_path = args.test_path,
         max_len_input = args.max_len_input,
         max_len_output = args.max_len_output,
+        encoder_info = args.encoder_info,
+        decoder_info = args.decoder_info,
         max_epochs = args.max_epochs,
         batch_size = args.batch_size,
         patience = args.patience,
@@ -233,18 +265,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Fine tune T5 for Question Generation.')
 
     # Add arguments
-    parser.add_argument('-dmn', '--dir_model_name', type=str, metavar='', default="qg_t5_small_512_64_8_3_skills_seed_42", required=False, help='Directory model name.')
+    parser.add_argument('-dmn', '--dir_model_name', type=str, metavar='', default="qg_t5_small_512_64_8_10_skilltext_questionanswer_seed_42", required=False, help='Directory model name.')
     parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
     parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')
 
-    parser.add_argument('-trp','--train_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/train.json", required=False, help='Train path.')
-    parser.add_argument('-vp','--val_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/val.json", required=False, help='Validation path.')
-    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/test.json", required=False, help='Test path.')
+    parser.add_argument('-trp','--train_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_ctrl2/train.json", required=False, help='Train path.')
+    parser.add_argument('-vp','--val_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_ctrl2/val.json", required=False, help='Validation path.')
+    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_ctrl2/test.json", required=False, help='Test path.')
 
     parser.add_argument('-mli','--max_len_input', type=int, metavar='', default=512, required=False, help='Max len input for encoding.')
     parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=64, required=False, help='Max len output for encoding.')
 
-    parser.add_argument('-me','--max_epochs', type=int, default=3, metavar='', required=False, help='Number of max Epochs')
+    parser.add_argument('-enci','--encoder_info', type=str, metavar='', default="skill_text", required=False, help='Information for encoding.')
+    parser.add_argument('-deci','--decoder_info', type=str, metavar='', default="question_answer", required=False, help='Information for decoding (generation).')
+
+    parser.add_argument('-me','--max_epochs', type=int, default=10, metavar='', required=False, help='Number of max Epochs')
     parser.add_argument('-bs','--batch_size', type=int, default=8, metavar='', required=False, help='Batch size.')
     parser.add_argument('-ptc','--patience', type=int, default=3, metavar='', required=False, help='Patience') # it is not being used for now
     parser.add_argument('-o','--optimizer', type=str, default='AdamW', metavar='', required=False, help='Optimizer')
