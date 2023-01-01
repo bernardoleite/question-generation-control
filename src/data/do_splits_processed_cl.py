@@ -1,5 +1,3 @@
-# section1 | [quest1,quest2,quest3,quest4] | [ans1,ans2,ans3,ans4] | [skillA, skillB, skillC,skillC]
-
 import json
 import sys
 import random
@@ -8,59 +6,94 @@ def get_dataset(split_gen):
 
     random.shuffle(split_gen)
     
-    attributes_counter = {'character':0,'setting':0,'action':0,'feeling':0,'causal':0,'outcome':0,'prediction':0}
-
     # array for saving new dataset
-    split_ctrl = []
+    split_cl = []
 
     # format of each dict
     empy_elem = {
+    "sections_uuids": [],
     "sections_uuids_concat": 'null', 
     "questions_reference": [],
     "answers_reference": [],
     "sections_texts_concat": 'null',
-    "attribute": 'null'
+    "attributes_per_question": [],
+    "character": 0,
+    "setting": 0,
+    "action": 0,
+    "feeling": 0,
+    "causal": 0,
+    "outcome": 0,
+    "prediction": 0
     }
 
     # append new element
-    split_ctrl.append(empy_elem)
+    split_cl.append(empy_elem)
 
     for question in split_gen:
 
+        sections_uuids = question["sections_uuids"]
         sections_uuids_concat = ''.join(question["sections_uuids"])
-        sections_texts_concat = ' '.join(question["sections_texts"])
-        question_reference = question["question_reference"]
-        attribute = question["attributes"][0]
+        sections_texts = question["sections_texts"]
+        sections_texts_concat = ' '.join(sections_texts)
+        question_reference = question["questions_reference"][0] # there is only 1 question_reference in _gen splits
         answer_reference = question["answer1"]
-        sections_uuids_exists = 0
+        attributes = [question["attributes"][0]] # only first attribute exists in this list, but this is done to match with other splits variable names
 
-        for elem in split_ctrl:
+        new_section = 1
+
+        for elem in split_cl:
             if sections_uuids_concat == elem['sections_uuids_concat']:
-                sections_uuids_exists = 1
-                # append to current elem if it exists
-                if attribute == elem["attribute"]:
-                    elem["questions_reference"].append(question_reference)
-                    elem["answers_reference"].append(answer_reference)
+                elem["questions_reference"].append(question_reference)
+                elem["answers_reference"].append(answer_reference)
+                elem["attributes_per_question"].append(attributes[0])
+                new_section = 0
         
-        # create new element if section uuid does not exist
-        if sections_uuids_exists == 0:
+        # create new element if it is a new <section,skill> pair
+        if new_section == 1:
             questions_reference = [question_reference]
             answers_reference = [answer_reference]
             new_elem = {
-            "sections_uuids_concat": sections_uuids_concat, 
+            "sections_uuids": sections_uuids,
+            "sections_uuids_concat": sections_uuids_concat,
+            "sections_texts": sections_texts,
+            "sections_texts_concat": sections_texts_concat,
             "questions_reference": questions_reference,
             "answers_reference": answers_reference,
-            "sections_texts_concat": sections_texts_concat,
-            "attribute": attribute
+            "attributes_per_question": attributes,
+            "character": 0,
+            "setting": 0,
+            "action": 0,
+            "feeling": 0,
+            "causal": 0,
+            "outcome": 0,
+            "prediction": 0
             }
-            attributes_counter[attribute] = attributes_counter[attribute] + 1
-            split_ctrl.append(new_elem)
+            split_cl.append(new_elem)
 
-    split_ctrl.pop(0) # remove first empty element
-    print(len(split_ctrl))
-    print(attributes_counter)
-    
-    return split_ctrl
+    split_cl.pop(0) # remove first empty element
+
+    for elem in split_cl:
+        # Removing duplicates in attributes with set()
+        attributes_unique_gold = list(set(elem["attributes_per_question"]))
+        for att in attributes_unique_gold:
+            if att == 'character':
+                elem["character"] = 1
+            if att == 'setting':
+                elem["setting"] = 1
+            if att == 'action':
+                elem["action"] = 1
+            if att == 'feeling':
+                elem["feeling"] = 1
+            if att == 'causal':
+                elem["causal"] = 1
+            if att == 'outcome':
+                elem["outcome"] = 1
+            if att == 'prediction':
+                elem["prediction"] = 1
+
+    print("Len of dataset created: ", len(split_cl))
+
+    return split_cl
 
 def run(train_gen, val_gen, test_gen):
 
@@ -69,7 +102,6 @@ def run(train_gen, val_gen, test_gen):
     test_cl = get_dataset(test_gen)
 
     return train_cl, val_cl, test_cl
-
 
 if __name__ == '__main__':
 

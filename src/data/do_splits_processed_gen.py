@@ -87,8 +87,6 @@ def change_headers_names(headers_questions):
     for idx, header in enumerate(headers_questions):
         if header == 'cor_section':
             headers_questions[idx] = 'section_id'
-        if header == 'question':
-            headers_questions[idx] = 'question_reference'
     return headers_questions
 
 def get_story_questions(file_path_questions):
@@ -137,6 +135,12 @@ def merge_questions_sections(file_name_story, story_sections, story_questions):
     
     return story_questions
 
+def produce_questions_answers_reference(story_questions):
+    for idx, question_story in enumerate(story_questions):
+        question_story['questions_reference'] = [question_story["question"]] # only first answer exists in this list, but this is done to match with other splits variable names
+        question_story['answers_reference'] = [question_story["answer1"]] # only first answer exists in this list, but this is done to match with other splits variable names
+    return story_questions
+
 def get_dataset(dataset_split):
     # get files names
     fairytaleqa_path_questions_split = fairytaleqa_path_questions + dataset_split
@@ -155,6 +159,9 @@ def get_dataset(dataset_split):
         # get processed story_sections and story_questions
         story_sections = get_story_sections(file_path_story)
         story_questions = get_story_questions(file_path_questions)
+
+        # produce list of answers_references
+        story_questions = produce_questions_answers_reference(story_questions)
 
         # merge attributes 1 and 2 (if exists)
         story_questions = merge_questions_attributes(story_questions)
