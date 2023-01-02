@@ -215,8 +215,8 @@ if __name__ == '__main__':
 
     # Add arguments
     parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qg_t5_small_512_64_8_10_skilltext_questionanswer_seed_42/model-epoch=04-val_loss=1.12.ckpt", required=False, help='Model folder checkpoint path.')
-    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qg_t5_small_512_64_8_10_skilltext_questionanswer_precl_predicted_seed_42/model-epoch=04-val_loss=1.12/", required=False, help='Folder path to save predictions after inference.')
-    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_precl_predicted/test.json", required=False, help='Test json path.')
+    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qg_t5_small_512_64_8_10_skilltext_questionanswer_precl_random_dist3_seed_42/model-epoch=04-val_loss=1.12/", required=False, help='Folder path to save predictions after inference.')
+    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_precl_random_dist3/test.json", required=False, help='Test json path.')
 
     parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
     parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')

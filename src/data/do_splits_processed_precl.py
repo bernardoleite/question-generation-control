@@ -5,6 +5,8 @@ import random
 import torch
 from operator import itemgetter
 
+import numpy as np
+
 from transformers import BertTokenizerFast as BertTokenizer
 from models import NarrativeTagger
 
@@ -38,7 +40,7 @@ def predict_attributes(text_narratives, tokenizer, trained_model, device, nr_att
     
     return list(attributes_predicted_best.keys())
 
-def get_dataset(split_cl, type_precl, tokenizer, trained_model, device):
+def get_dataset(split_cl, type_precl, tokenizer, trained_model, device, random_seed):
 
     #random.shuffle(split_cl)
     
@@ -59,13 +61,18 @@ def get_dataset(split_cl, type_precl, tokenizer, trained_model, device):
         # Removing duplicates in attributes with set()
         attributes_unique_gold = list(set(attributes))
         attributes_unique_random = random.sample(possible_attributes, len(attributes_unique_gold))
-        attributes_unique_predicted = predict_attributes(' '.join(question["sections_texts"]), tokenizer, trained_model, device, len(attributes_unique_gold))
 
         if type_precl == "gold":
             attributes_unique = attributes_unique_gold
         elif type_precl == "random":
             attributes_unique = attributes_unique_random
+        elif type_precl == "random_dist":
+            weights=[0.12, 0.07, 0.27, 0.11, 0.27, 0.11, 0.05]
+            weights = [w/sum(weights) for w in weights]
+            attributes_unique = np.random.choice(possible_attributes, size=len(attributes_unique_gold), replace=False, p=weights)
+            attributes_unique = attributes_unique.tolist()
         elif type_precl == "predicted":
+            attributes_unique_predicted = predict_attributes(' '.join(question["sections_texts"]), tokenizer, trained_model, device, len(attributes_unique_gold))
             attributes_unique = attributes_unique_predicted
         else:
             print("Error!")
@@ -83,10 +90,12 @@ def get_dataset(split_cl, type_precl, tokenizer, trained_model, device):
             }
             split_precl.append(new_elem)
 
+            #print(attributes_unique)
+    
     print("Len of dataset created: ", len(split_precl))
     return split_precl
 
-def run(train_gen, val_gen, test_gen, type_precl):
+def run(train_cl, val_cl, test_cl, type_precl, random_seed):
     LABEL_COLUMNS = ['character','setting','action','feeling','causal','outcome','prediction']
 
     trained_model = NarrativeTagger.load_from_checkpoint(
@@ -102,9 +111,9 @@ def run(train_gen, val_gen, test_gen, type_precl):
     BERT_MODEL_NAME = 'bert-base-cased'
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME)
 
-    train_precl = get_dataset(train_gen, type_precl, tokenizer, trained_model, device)
-    val_precl = get_dataset(val_gen, type_precl, tokenizer, trained_model, device)
-    test_precl = get_dataset(test_gen, type_precl, tokenizer, trained_model, device)
+    train_precl = get_dataset(train_cl, type_precl, tokenizer, trained_model, device, random_seed)
+    val_precl = get_dataset(val_cl, type_precl, tokenizer, trained_model, device, random_seed)
+    test_precl = get_dataset(test_cl, type_precl, tokenizer, trained_model, device, random_seed)
 
     return train_precl, val_precl, test_precl
 
@@ -118,8 +127,22 @@ if __name__ == '__main__':
     with open("../../data/FairyTaleQA_Dataset/processed_cl/test.json", "r", encoding='utf-8') as read_file:
         test_cl = json.load(read_file)
 
-    type_precl = "predicted"
-    train_precl, val_precl, test_precl  = run(train_cl, val_cl, test_cl, type_precl)
+    type_precl = "random_dist"
+    radom_seed = 3
+    train_precl, val_precl, test_precl  = run(train_cl, val_cl, test_cl, type_precl, radom_seed)
+
+    attributes_counter = {'character':0,'setting':0,'action':0,'feeling':0,'causal':0,'outcome':0,'prediction':0}
+    for elem in test_precl:
+        attributes_counter[elem["target_attribute"]] = attributes_counter[elem["target_attribute"]] + 1
+
+    attributes_counter_ordered = dict(sorted(attributes_counter.items(), key = itemgetter(1), reverse = True)[:7])
+    #a_new = {k: v / total for total in (sum(attributes_counter_ordered.values()),) for k, v in attributes_counter_ordered.items()}
+
+    #print(attributes_counter_ordered)
+    #sys.exit()
+
+    if "random" in type_precl:
+        type_precl = type_precl + str(radom_seed)
 
     # https://stackoverflow.com/questions/273192/how-can-i-safely-create-a-nested-directory
     from pathlib import Path
