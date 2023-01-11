@@ -1,13 +1,13 @@
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from transformers import (
-    AdamW,
     T5ForConditionalGeneration,
     T5Tokenizer,
     get_linear_schedule_with_warmup
 )
 import torch
 from torch import nn, optim
+from torch.optim import AdamW
 import sys
 
 # T5 Finetuner

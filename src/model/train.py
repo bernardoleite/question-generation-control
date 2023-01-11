@@ -62,7 +62,8 @@ class QGDataModule(pl.LightningDataModule):
         self.encoder_info = params.encoder_info
         self.decoder_info = params.decoder_info
 
-    def setup(self):
+    # (update 11-01-23) https://stackoverflow.com/questions/71922261/typeerror-setup-got-an-unexpected-keyword-argument-stage
+    def setup(self, stage=None): 
         self.train_dataset = QGDataset(self.train_list, self.tokenizer, self.max_len_input, self.max_len_output, self.encoder_info, self.decoder_info)
         self.validation_dataset = QGDataset(self.val_list, self.tokenizer, self.max_len_input, self.max_len_output, self.encoder_info, self.decoder_info)
         self.test_dataset = QGDataset(self.test_list, self.tokenizer, self.max_len_input, self.max_len_output, self.encoder_info, self.decoder_info)
@@ -137,7 +138,7 @@ class QGDataset(Dataset):
             truncation = True,
             add_special_tokens=True,
             return_overflowing_tokens = True, # if (source_encoding.num_truncated_tokens.item() > 0): !!!!!!!! (future)
-            max_length=self.max_len_input, 
+            max_length=self.max_len_input,
             padding='max_length', 
             return_tensors="pt"
         )
@@ -146,7 +147,7 @@ class QGDataset(Dataset):
             target_concat, 
             truncation = True,
             add_special_tokens=True,
-            max_length=self.max_len_output, 
+            max_length=self.max_len_output,
             padding='max_length',
             return_tensors="pt"
         )
@@ -172,8 +173,8 @@ class QGDataset(Dataset):
 def run(args):
     pl.seed_everything(args.seed_value)
 
-    # Load Tokenizer
-    t5_tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_name)
+    # Load Tokenizer (update 11-01-23)
+    t5_tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_name, model_max_length=512)
     t5_tokenizer.add_tokens(['<skill>','<question>','<answer>','<answertype>','<text>'], special_tokens=True)
 
     # Load model
@@ -236,7 +237,7 @@ def run(args):
     trainer = pl.Trainer(
         callbacks = [checkpoint_callback, early_stopping_callback],
         max_epochs = args.max_epochs, 
-        gpus = args.num_gpus,
+        accelerator='gpu', devices=1, #gpus=1 (older version)
         logger = [tb_logger, csv_logger]
     ) #progress_bar_refresh_rate=30
 
@@ -274,7 +275,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Fine tune T5 for Question Generation.')
 
     # Add arguments
-    parser.add_argument('-dmn', '--dir_model_name', type=str, metavar='', default="qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44", required=False, help='Directory model name.')
+    parser.add_argument('-dmn', '--dir_model_name', type=str, metavar='', default="qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44_updated", required=False, help='Directory model name.')
     parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
     parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')
 

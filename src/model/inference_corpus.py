@@ -134,7 +134,7 @@ def run(args):
     params = argparse.Namespace(**params_dict)
 
     # Load T5 base Tokenizer
-    t5_tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_name)
+    t5_tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_name, model_max_length=512)
     t5_tokenizer.add_tokens(['<skill>','<question>','<answer>','<answertype>','<text>'], special_tokens=True)
 
     # Load T5 base Model
@@ -243,8 +243,8 @@ if __name__ == '__main__':
 
     # Add arguments
     # Add arguments
-    parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44/model-epoch=05-val_loss=1.13.ckpt", required=False, help='Model folder checkpoint path.')
-    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44/model-epoch=05-val_loss=1.13/", required=False, help='Folder path to save predictions after inference.')
+    parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44_updated/model-epoch=05-val_loss=1.13.ckpt", required=False, help='Model folder checkpoint path.')
+    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44_updated/model-epoch=05-val_loss=1.13/", required=False, help='Folder path to save predictions after inference.')
     parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_ctrl_sk_a/test.json", required=False, help='Test json path.')
 
     parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
