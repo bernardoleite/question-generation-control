@@ -24,7 +24,7 @@ from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
 import textwrap
 
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning import loggers as pl_loggers
 
 from transformers import (
@@ -110,6 +110,12 @@ class QGDataset(Dataset):
             input_concat = '<skill>' + data_row['attributes'][0] + '<text>' + ' '.join(data_row['sections_texts'])
         elif self.encoder_info == "skill_answer_text":
             input_concat = '<skill>' + data_row['attributes'][0] + '</skill>' + '<answer>' + data_row['answers_reference'][0] + '</answer>' + '<text>' + ' '.join(data_row['sections_texts']) + '</text>'
+        elif self.encoder_info == "question_text": #qa1
+            input_concat = '<question>' + data_row['questions_reference'][0] + '<text>' + ' '.join(data_row['sections_texts'])
+        elif self.encoder_info == "answertype_text":
+            input_concat = '<answertype>' + data_row['ex-or-im1'] + '<text>' + ' '.join(data_row['sections_texts'])
+        elif self.encoder_info == "skill_answertype_text":
+            input_concat = '<skill>' + data_row['attributes'][0] + '<answertype>' + data_row['ex-or-im1'] + '<text>' + ' '.join(data_row['sections_texts'])
         else:
             print("Error with encoder_info.")
             sys.exit()
@@ -119,6 +125,8 @@ class QGDataset(Dataset):
             target_concat = data_row['questions_reference'][0]
         elif self.decoder_info == "question_answer":
             target_concat = '<question>' + data_row['questions_reference'][0] + '<answer>' + data_row['answers_reference'][0]
+        elif self.decoder_info == "answer": #qa
+            target_concat = data_row['answers_reference'][0]
         else:
             print("Error with decoder_info.")
             sys.exit()
@@ -166,7 +174,7 @@ def run(args):
 
     # Load Tokenizer
     t5_tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_name)
-    t5_tokenizer.add_tokens(['<skill>','</skill>','<question>','</question>','<answer>','</answer>','<text>','</text>'], special_tokens=True)
+    t5_tokenizer.add_tokens(['<skill>','<question>','<answer>','<answertype>','<text>'], special_tokens=True)
 
     # Load model
     if "mt5" in args.model_name:
@@ -214,18 +222,19 @@ def run(args):
     checkpoint_callback = ModelCheckpoint(
         dirpath=CHECKPOINTS_PATH, #save at this folder
         filename="model-{epoch:02d}-{val_loss:.2f}", #name for the checkpoint, before i was using "best-checkpoint"
-        save_top_k=args.max_epochs, #save all epochs, before it was only the best (1)
+        save_top_k=3, #save all epochs, before it was only the best (1)
         verbose=True, #output something when a model is saved
         monitor="val_loss", #monitor the validation loss
         mode="min" #save the model with minimum validation loss
     )
+    early_stopping_callback = EarlyStopping(monitor='val_loss', patience=args.patience)
 
     tb_logger = pl_loggers.TensorBoardLogger(save_dir=TB_LOGS_PATH)
     csv_logger = pl_loggers.CSVLogger(save_dir=CSV_LOGS_PATH)
     csv_logger.log_hyperparams(params)
 
     trainer = pl.Trainer(
-        callbacks = [checkpoint_callback],
+        callbacks = [checkpoint_callback, early_stopping_callback],
         max_epochs = args.max_epochs, 
         gpus = args.num_gpus,
         logger = [tb_logger, csv_logger]
@@ -265,29 +274,29 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Fine tune T5 for Question Generation.')
 
     # Add arguments
-    parser.add_argument('-dmn', '--dir_model_name', type=str, metavar='', default="qg_t5_small_512_64_8_10_skilltext_questionanswer_seed_42", required=False, help='Directory model name.')
+    parser.add_argument('-dmn', '--dir_model_name', type=str, metavar='', default="qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44", required=False, help='Directory model name.')
     parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
     parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')
 
-    parser.add_argument('-trp','--train_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_ctrl2/train.json", required=False, help='Train path.')
-    parser.add_argument('-vp','--val_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_ctrl2/val.json", required=False, help='Validation path.')
-    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_ctrl2/test.json", required=False, help='Test path.')
+    parser.add_argument('-trp','--train_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/train.json", required=False, help='Train path.')
+    parser.add_argument('-vp','--val_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/val.json", required=False, help='Validation path.')
+    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_gen/test.json", required=False, help='Test path.')
 
     parser.add_argument('-mli','--max_len_input', type=int, metavar='', default=512, required=False, help='Max len input for encoding.')
-    parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=64, required=False, help='Max len output for encoding.')
+    parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=128, required=False, help='Max len output for encoding.')
 
-    parser.add_argument('-enci','--encoder_info', type=str, metavar='', default="skill_text", required=False, help='Information for encoding.')
+    parser.add_argument('-enci','--encoder_info', type=str, metavar='', default="answertype_text", required=False, help='Information for encoding.')
     parser.add_argument('-deci','--decoder_info', type=str, metavar='', default="question_answer", required=False, help='Information for decoding (generation).')
 
     parser.add_argument('-me','--max_epochs', type=int, default=10, metavar='', required=False, help='Number of max Epochs')
     parser.add_argument('-bs','--batch_size', type=int, default=8, metavar='', required=False, help='Batch size.')
-    parser.add_argument('-ptc','--patience', type=int, default=3, metavar='', required=False, help='Patience') # it is not being used for now
+    parser.add_argument('-ptc','--patience', type=int, default=2, metavar='', required=False, help='Patience')
     parser.add_argument('-o','--optimizer', type=str, default='AdamW', metavar='', required=False, help='Optimizer')
     parser.add_argument('-lr','--learning_rate', type=float, default=1e-4, metavar='', required=False, help='The learning rate to use.')
     parser.add_argument('-eps','--epsilon', type=float, default=1e-6, metavar='', required=False, help='Adam epsilon for numerical stability')
 
     parser.add_argument('-ng','--num_gpus', type=int, default=1, metavar='', required=False, help='Number of gpus.')
-    parser.add_argument('-sv','--seed_value', type=int, default=42, metavar='', required=False, help='Seed value.')
+    parser.add_argument('-sv','--seed_value', type=int, default=44, metavar='', required=False, help='Seed value.')
     parser.add_argument('-cd', '--current_date', type=str, metavar='', default=currentdate(), required=False, help='Current date.')
 
     # Parse arguments

@@ -27,9 +27,17 @@ def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer, questio
     elif args.encoder_info == "answer_text":
         input_concat = '<answer>' + question['answers_reference'][0] + '</answer>' + '<text>' + ' '.join(question['sections_texts']) + '</text>'
     elif args.encoder_info == "skill_text":
-        input_concat = '<skill>' + question['target_attribute'] + '<text>' + ' '.join(question['sections_texts'])
+        input_concat = '<skill>' + question['attributes'][0] + '<text>' + ' '.join(question['sections_texts'])
     elif args.encoder_info == "skill_answer_text":
         input_concat = '<skill>' + question['attributes'][0] + '</skill>' + '<answer>' + question['answers_reference'][0] + '</answer>' + '<text>' + ' '.join(question['sections_texts']) + '</text>'
+    elif args.encoder_info == "question_text": #qa1
+        input_concat = '<question>' + question['questions_reference'][0] + '<text>' + ' '.join(question['sections_texts'])
+    elif args.encoder_info == "questiongen_text": #qa2
+        input_concat = '<question>' + question['gen_question'] + '<text>' + ' '.join(question['sections_texts'])
+    elif args.encoder_info == "answertype_text":
+        input_concat = '<answertype>' + question['ex-or-im1'] + '<text>' + ' '.join(question['sections_texts'])
+    elif args.encoder_info == "skill_answertype_text":
+        input_concat = '<skill>' + question['attributes'][0] + '<answertype>' + question['ex-or-im1'] + '<text>' + ' '.join(question['sections_texts'])
     else:
         print("Error with encoder_info.")
         sys.exit()
@@ -75,7 +83,10 @@ def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer, questio
             generated_answer = find_string_between_two_substring(generated_str, '<answer>', '<END>')
         else:
             print("Error during inference: question_answer (1)!")
-            sys.exit()
+            return "ERROR", "ERROR"
+            #sys.exit()
+    elif args.decoder_info == 'answer': #qa
+        generated_answer = ''.join(preds)
     else:
         print("Error during inference: question_answer (2)!")
         sys.exit()
@@ -88,10 +99,10 @@ def validate_generated_str(str):
 
     if question_begin == 1 and answer_begin == 1:
         validation_global = validation_global + 1
+        return 1
     else:
-        print(str,"\n")
-
-    return 1
+        print("Error in this generated text: ", str,"\n")
+        return -1
 
 def show_result(generated: str, answer: str, context:str, original_question: str = ''):
     print('Generated: ', generated)
@@ -124,7 +135,7 @@ def run(args):
 
     # Load T5 base Tokenizer
     t5_tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_name)
-    t5_tokenizer.add_tokens(['<skill>','</skill>','<question>','</question>','<answer>','</answer>','<text>','</text>'], special_tokens=True)
+    t5_tokenizer.add_tokens(['<skill>','<question>','<answer>','<answertype>','<text>'], special_tokens=True)
 
     # Load T5 base Model
     if "mt5" in args.model_name:
@@ -162,16 +173,33 @@ def run(args):
     start_time_generate = time.time()
     printcounter = 0
     for index, row in enumerate(test_list):
+
+        target_attribute = 'null'
+        ex_or_im1 = 'null'
+        qa_answer = 'null'
+        if "target_attribute" in row:
+            target_attribute = row['target_attribute']
+        if "ex-or-im1" in row:
+            ex_or_im1 = row['ex-or-im1']
+
         gen_question, gen_answer = generate(args, device, qgmodel, t5_tokenizer, row)
+
+        if args.encoder_info == "questiongen_text":
+            qa_answer = gen_answer
+            gen_answer = [row['gen_answer']]
+            gen_question = row['gen_question']
+
         predictions.append(
             {'sections_uuids': row['sections_uuids'],
             'questions_reference': row['questions_reference'],
             'answers_reference': row['answers_reference'],
+            'ex-or-im1': ex_or_im1,
             'sections_texts': row['sections_texts'],
-            'attributes': row['attributes_per_question'],
-            'target_attribute': row['target_attribute'],
+            'attributes': row['attributes'],
+            'target_attribute': target_attribute,
             'gen_question': gen_question,
-            'gen_answer': gen_answer} 
+            'gen_answer': gen_answer,
+            'qa_answer': qa_answer} 
         )
         printcounter += 1
         if (printcounter == 500):
@@ -214,25 +242,26 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Generate questions and save them to json file.')
 
     # Add arguments
-    parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qg_t5_small_512_64_8_10_skilltext_questionanswer_seed_42/model-epoch=04-val_loss=1.12.ckpt", required=False, help='Model folder checkpoint path.')
-    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qg_t5_small_512_64_8_10_skilltext_questionanswer_precl_random_dist3_seed_42/model-epoch=04-val_loss=1.12/", required=False, help='Folder path to save predictions after inference.')
-    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_precl_random_dist3/test.json", required=False, help='Test json path.')
+    # Add arguments
+    parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44/model-epoch=05-val_loss=1.13.ckpt", required=False, help='Model folder checkpoint path.')
+    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44/model-epoch=05-val_loss=1.13/", required=False, help='Folder path to save predictions after inference.')
+    parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_ctrl_sk_a/test.json", required=False, help='Test json path.')
 
     parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
     parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')
 
     parser.add_argument('-bs','--batch_size', type=int, metavar='', default=8, required=False, help='Batch size.')
     parser.add_argument('-mli','--max_len_input', type=int, metavar='', default=512, required=False, help='Max len input for encoding.')
-    parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=64, required=False, help='Max len output for encoding.')
+    parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=128, required=False, help='Max len output for encoding.')
 
-    parser.add_argument('-enci','--encoder_info', type=str, metavar='', default="skill_text", required=False, help='Information for encoding.')
+    parser.add_argument('-enci','--encoder_info', type=str, metavar='', default="answertype_text", required=False, help='Information for encoding.')
     parser.add_argument('-deci','--decoder_info', type=str, metavar='', default="question_answer", required=False, help='Information for decoding (generation).')
 
     parser.add_argument('-nb','--num_beams', type=int, metavar='', default=5, required=False, help='Number of beams.')
     parser.add_argument('-nrs','--num_return_sequences', type=int, metavar='', default=1, required=False, help='Number of returned sequences.')
     parser.add_argument('-rp','--repetition_penalty', type=float, metavar='', default=1.0, required=False, help='Repetition Penalty.')
     parser.add_argument('-lp','--length_penalty', type=float, metavar='', default=1.0, required=False, help='Length Penalty.')
-    parser.add_argument('-sv','--seed_value', type=int, default=42, metavar='', required=False, help='Seed value.')
+    parser.add_argument('-sv','--seed_value', type=int, default=44, metavar='', required=False, help='Seed value.')
 
     # Parse arguments
     args = parser.parse_args()
