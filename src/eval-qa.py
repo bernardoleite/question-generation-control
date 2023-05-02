@@ -30,7 +30,7 @@ def get_rouge_option_rouge_scorer(references, predictions, lower_case=True, lang
         rougeL_r_scores.append(scores['rougeL'][R_INDEX])
         rougeL_f_scores.append(scores['rougeL'][F_INDEX])
 
-    return {"r": mean(rougeL_r_scores), "p": mean(rougeL_p_scores), "f": mean(rougeL_f_scores)}
+    return {"r": round(mean(rougeL_r_scores),5), "p": round(mean(rougeL_p_scores),5), "f": round(mean(rougeL_f_scores),5)}
 
 def get_corpus_bleu(references, predictions, lower_case=False, language="english"):
     list_of_references = []
@@ -56,7 +56,7 @@ def get_corpus_bleu(references, predictions, lower_case=False, language="english
     bleu_3 = corpus_bleu(list_of_references, hypotheses, weights = [1/3,1/3,1/3,0])
     bleu_4 = corpus_bleu(list_of_references, hypotheses, weights = [0.25,0.25,0.25,0.25])
 
-    return {"Bleu_1": bleu_1, "Bleu_2": bleu_2, "Bleu_3": bleu_3, "Bleu_4": bleu_4}
+    return {"Bleu_1": round(bleu_1,4), "Bleu_2": round(bleu_2,4), "Bleu_3": round(bleu_3,4), "Bleu_4": round(bleu_4,4)}
 
 def run(args):
     # Read predictions file
@@ -64,8 +64,8 @@ def run(args):
         predictions = json.load(file)
     
     # Main change for QA evaluation
-    answers_reference_all = [ref['answers_reference'] for ref in predictions]
-    answers_generated_all = [pred['gen_answer'] for pred in predictions]
+    answers_reference_all = [ref['gen_answer'] for ref in predictions]
+    answers_generated_all = [pred['qa_answer'] for pred in predictions]
 
     # https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists
     answers_reference_all_flat = [item for sublist in answers_reference_all for item in sublist] # for exact_match
@@ -74,10 +74,10 @@ def run(args):
     predictions_explicit = list(filter(lambda d: d['ex-or-im1'] in ["explicit"], predictions))
     predictions_implicit = list(filter(lambda d: d['ex-or-im1'] in ["implicit"], predictions))
 
-    answers_reference_explicit = [ref['answers_reference'] for ref in predictions_explicit]
-    answers_generated_explicit = [pred['gen_answer'] for pred in predictions_explicit]
-    answers_reference_implicit = [ref['answers_reference'] for ref in predictions_implicit]
-    answers_generated_implicit = [pred['gen_answer'] for pred in predictions_implicit]
+    answers_reference_explicit = [ref['gen_answer'] for ref in predictions_explicit]
+    answers_generated_explicit = [pred['qa_answer'] for pred in predictions_explicit]
+    answers_reference_implicit = [ref['gen_answer'] for ref in predictions_implicit]
+    answers_generated_implicit = [pred['qa_answer'] for pred in predictions_implicit]
 
     # https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists
     answers_reference_explicit_flat = [item for sublist in answers_reference_explicit for item in sublist] # for exact_match
@@ -88,7 +88,7 @@ def run(args):
     print("EM (ALL): ", round(results["exact_match"], 3))
     exact_match_metric = load("exact_match")
     results = exact_match_metric.compute(predictions=answers_generated_explicit, references=answers_reference_explicit_flat)
-    print("EM (EXPLICIT): ", round(results["exact_match"], 3))
+    print("EM (EXPLICIT): ", round(results["exact_match"], 4))
     results = exact_match_metric.compute(predictions=answers_generated_implicit, references=answers_reference_implicit_flat)
     print("EM (IMPLICIT): ", round(results["exact_match"], 3))
 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Evaluation script fo QA.')
 
     # Add arguments
-    parser.add_argument('-pp','--predictions_path', type=str, metavar='', default="../predictions/qa_t5_small_512_128_8_10_question-text_answer_seed_43/model-epoch=04-val_loss=0.85/", required=False, help='Predictions path.')
+    parser.add_argument('-pp','--predictions_path', type=str, metavar='', default="../predictions/qa_questiongen_t5_base_512_128_32_10_answertype-text_question-answer_seed_44/model-epoch=04-val_loss=0.99/", required=False, help='Predictions path.')
     parser.add_argument('-lg','--language', type=str, metavar='', default="english", required=False, help='Language for tokenize.')
 
     # Parse arguments
