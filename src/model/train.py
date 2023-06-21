@@ -106,7 +106,7 @@ class QGDataset(Dataset):
         if self.encoder_info == "text":
             input_concat = ' '.join(data_row['sections_texts'])
         elif self.encoder_info == "answer_text":
-            input_concat = '<answer>' + data_row['answers_reference'][0] + '</answer>' + '<text>' + ' '.join(data_row['sections_texts']) + '</text>'
+            input_concat = '<answer>' + data_row['answers_reference'][0] + '<text>' + ' '.join(data_row['sections_texts'])
         elif self.encoder_info == "skill_text":
             input_concat = '<skill>' + data_row['attributes'][0] + '<text>' + ' '.join(data_row['sections_texts'])
         elif self.encoder_info == "skill_answer_text":
@@ -237,7 +237,7 @@ def run(args):
     trainer = pl.Trainer(
         callbacks = [checkpoint_callback, early_stopping_callback],
         max_epochs = args.max_epochs, 
-        accelerator='gpu', devices=1, #gpus=1 (older version)
+        accelerator='gpu', devices=[1], #gpus=1 (older version)
         logger = [tb_logger, csv_logger]
     ) #progress_bar_refresh_rate=30
 
@@ -249,12 +249,6 @@ def run(args):
     with open(args.test_path, "r", encoding='utf-8') as read_file:
         test_list = json.load(read_file)
 
-    # DELETE!!! JUST for FAST TESTING <----
-    #####
-    #train_df = pd.read_csv('../../data/squad_experiments/squad_v1_train.csv')
-    #validation_df = pd.read_csv('../../data/squad_experiments/squad_v1_val.csv')
-    #test_df = pd.read_csv('../../data/squad_experiments/squad_v1_val.csv')
-    #####
 
     data_module = QGDataModule(params, t5_tokenizer, train_list, val_list, test_list)
     data_module.setup()
@@ -263,8 +257,6 @@ def run(args):
 
     trainer.fit(model, datamodule=data_module)
     trainer.test(ckpt_path="best", datamodule=data_module)
-    #trainer.test(ckpt_path='best', dataloaders = data_module.test_dataloader)
-    #trainer.test(ckpt_path=trainer.model_checkpoint.last_model_path)
 
     end_time_train = time.time()
     train_total_time = end_time_train - start_time_train
@@ -275,7 +267,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Fine tune T5 for Question Generation.')
 
     # Add arguments
-    parser.add_argument('-dmn', '--dir_model_name', type=str, metavar='', default="qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44_updated", required=False, help='Directory model name.')
+    parser.add_argument('-dmn', '--dir_model_name', type=str, metavar='', default="qq_t5_base_512_128_32_10_answertype-text_question-answer_seed_${i}", required=False, help='Directory model name.')
     parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
     parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')
 

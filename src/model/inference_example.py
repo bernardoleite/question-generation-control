@@ -36,11 +36,11 @@ def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer, prompt:
     generated_ids = qgmodel.model.generate(
         input_ids=input_ids,
         attention_mask=attention_mask,
-        num_return_sequences=args.num_return_sequences, # defaults to 1
-        num_beams=args.num_beams, # defaults to 1 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! myabe experiment with 5
+        num_return_sequences=args.num_return_sequences,
+        num_beams=args.num_beams,
         max_length=args.max_len_output,
-        repetition_penalty=args.repetition_penalty, # defaults to 1.0, #last value was 2.5
-        length_penalty=args.length_penalty, # defaults to 1.0
+        repetition_penalty=args.repetition_penalty,
+        length_penalty=args.length_penalty,
         early_stopping=True, # defaults to False
         use_cache=True
     )

@@ -1,7 +1,9 @@
-predictions
+predictions/gpt3
+predictions/t5-large
+predictions/t5-base
 checkpoints
-data/FairyTaleQA_Dataset
-data/FairyTaleQA_Dataset_Sentence_Split
+data/FairyTaleQA_Dataset/
+data/FairyTaleQA_Dataset_Sentence_Split/
 .DS_Store
 
 # Byte-compiled / optimized / DLL files

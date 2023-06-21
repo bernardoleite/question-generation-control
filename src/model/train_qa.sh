@@ -3,7 +3,7 @@
 for ((i=44; i <= 44; i++))
 do
 	taskset --cpu-list 1-24 python train.py \
-	 --dir_model_name "qq_t5_base_512_128_8_10_answertype-text_question-answer_seed_${i}" \
+	 --dir_model_name "qa_t5_base_512_128_8_10_question-text_answer_seed_${i}" \
 	 --model_name "t5-base" \
 	 --tokenizer_name "t5-base" \
 	 --train_path "../../data/FairytaleQA_Dataset/processed_gen/train.json" \
