@@ -5,7 +5,6 @@ from transformers import (
 )
 
 import argparse
-import pandas as pd
 import sys
 sys.path.append('../')
 
@@ -20,12 +19,13 @@ import torch
 validation_global = 0
 
 def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer, question: dict) -> str:
+    global validation_global
 
     # enconding info
     if args.encoder_info == "text":
         input_concat = ' '.join(question['sections_texts'])
     elif args.encoder_info == "answer_text":
-        input_concat = '<answer>' + question['answers_reference'][0] + '</answer>' + '<text>' + ' '.join(question['sections_texts']) + '</text>'
+        input_concat = '<answer>' + question['answers_reference'][0] + '<text>' + ' '.join(question['sections_texts'])
     elif args.encoder_info == "skill_text":
         input_concat = '<skill>' + question['attributes'][0] + '<text>' + ' '.join(question['sections_texts'])
     elif args.encoder_info == "skill_answer_text":
@@ -59,11 +59,11 @@ def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer, questio
     generated_ids = qgmodel.model.generate(
         input_ids=input_ids,
         attention_mask=attention_mask,
-        num_return_sequences=args.num_return_sequences, # defaults to 1
-        num_beams=args.num_beams, # defaults to 1 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! myabe experiment with 5
+        num_return_sequences=args.num_return_sequences
+        num_beams=args.num_beams,
         max_length=args.max_len_output,
-        repetition_penalty=args.repetition_penalty, # defaults to 1.0, #last value was 2.5
-        length_penalty=args.length_penalty, # defaults to 1.0
+        repetition_penalty=args.repetition_penalty,
+        length_penalty=args.length_penalty,
         early_stopping=True, # defaults to False
         use_cache=True
     )
@@ -73,35 +73,35 @@ def generate(args, device, qgmodel: T5FineTuner, tokenizer: T5Tokenizer, questio
         tokenizer.decode(generated_id, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         for generated_id in generated_ids
     }
-    if args.decoder_info == 'question':
+    if args.decoder_info == 'question': #qg1
         generated_question = ''.join(preds)
-    elif args.decoder_info == 'question_answer':
+    elif args.decoder_info == 'question_answer': #qg2
         generated_str = ''.join(preds)
-        validate_generated_str(generated_str)
-        if '<question>' in generated_str and '<answer>' in generated_str:
+        res_validation = validate_generated_str(generated_str)
+        
+        if res_validation == 1:
             generated_question = find_string_between_two_substring(generated_str, '<question>', '<answer>')
-            generated_answer = find_string_between_two_substring(generated_str, '<answer>', '<END>')
+            generated_answer = find_string_between_two_substring(generated_str, '<answer>', '<END>')  
         else:
-            print("Error during inference: question_answer (1)!")
-            return "ERROR", "ERROR"
-            #sys.exit()
+            print("Error during inference, nr. of <question> or <answer> tags is different to 1 !")
+            return "ERROR_QUESTION", "ERROR_ANSWER" # this will force any outlier qg result to be zero
+
     elif args.decoder_info == 'answer': #qa
         generated_answer = ''.join(preds)
     else:
         print("Error during inference: question_answer (2)!")
         sys.exit()
+    
+    validation_global = validation_global + 1
     return generated_question, generated_answer
 
 def validate_generated_str(str):
     question_begin = str.count("<question>")
     answer_begin = str.count("<answer>")
-    global validation_global
 
     if question_begin == 1 and answer_begin == 1:
-        validation_global = validation_global + 1
         return 1
     else:
-        print("Error in this generated text: ", str,"\n")
         return -1
 
 def show_result(generated: str, answer: str, context:str, original_question: str = ''):
@@ -159,8 +159,6 @@ def run(args):
     # Read test data
     with open(args.test_path, "r", encoding='utf-8') as read_file:
         test_list = json.load(read_file)
-    #test_list = pd.read_pickle(args.test_path)
-    #test_list = test_list.sample(n=20) # to DELETEEEEEE !!!!!!!!!!!!!!
 
     predictions = []
 
@@ -188,6 +186,8 @@ def run(args):
             qa_answer = gen_answer
             gen_answer = [row['gen_answer']]
             gen_question = row['gen_question']
+            if gen_question == 'ERROR_QUESTION' or gen_question == 'ERROR_ANSWER':
+                qa_answer = '8T*^19$0@&bR2' # this will force any outlier QA result to be zero
 
         predictions.append(
             {'sections_uuids': row['sections_uuids'],
@@ -242,19 +242,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Generate questions and save them to json file.')
 
     # Add arguments
-    # Add arguments
-    parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44_updated/model-epoch=05-val_loss=1.13.ckpt", required=False, help='Model folder checkpoint path.')
-    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qq_t5_small_512_128_8_10_answertype-text_question-answer_seed_44_updated/model-epoch=05-val_loss=1.13/", required=False, help='Folder path to save predictions after inference.')
+    parser.add_argument('-cmp','--checkpoint_model_path', type=str, metavar='', default="../../checkpoints/qg_t5_base_512_128_32_10_skill-text_question-answer_seed_44/model-epoch=XX-val_loss=YY.ckpt", required=False, help='Model folder checkpoint path.')
+    parser.add_argument('-psp','--predictions_save_path', type=str, metavar='', default="../../predictions/qg_t5_base_512_128_32_10_skill-text_question-answer_seed_44/model-epoch=XX-val_loss=YY/", required=False, help='Folder path to save predictions after inference.')
     parser.add_argument('-tp','--test_path', type=str, metavar='', default="../../data/FairytaleQA_Dataset/processed_ctrl_sk_a/test.json", required=False, help='Test json path.')
 
-    parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-small", required=False, help='Model name.')
-    parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-small", required=False, help='Tokenizer name.')
+    parser.add_argument('-mn','--model_name', type=str, metavar='', default="t5-base", required=False, help='Model name.')
+    parser.add_argument('-tn','--tokenizer_name', type=str, metavar='', default="t5-base", required=False, help='Tokenizer name.')
 
-    parser.add_argument('-bs','--batch_size', type=int, metavar='', default=8, required=False, help='Batch size.')
+    parser.add_argument('-bs','--batch_size', type=int, metavar='', default=32, required=False, help='Batch size.')
     parser.add_argument('-mli','--max_len_input', type=int, metavar='', default=512, required=False, help='Max len input for encoding.')
     parser.add_argument('-mlo','--max_len_output', type=int, metavar='', default=128, required=False, help='Max len output for encoding.')
 
-    parser.add_argument('-enci','--encoder_info', type=str, metavar='', default="answertype_text", required=False, help='Information for encoding.')
+    parser.add_argument('-enci','--encoder_info', type=str, metavar='', default="skill_text", required=False, help='Information for encoding.')
     parser.add_argument('-deci','--decoder_info', type=str, metavar='', default="question_answer", required=False, help='Information for decoding (generation).')
 
     parser.add_argument('-nb','--num_beams', type=int, metavar='', default=5, required=False, help='Number of beams.')
