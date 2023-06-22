@@ -35,7 +35,7 @@ Python 3 (tested with version 3.9.13 on Windows 10)
 You can use this code for **data preparation**, **training**, **inference/predicting** and **evaluation**.
 
 ### Data preparation
-Current experiments use the [FairytaleQA](https://aclanthology.org/2022.acl-long.34/) dataset. So the next steps are specifically intended to preparing this dataset, but the same approach is applicable to other data types.
+Current experiments use the [FairytaleQA](https://aclanthology.org/2022.acl-long.34/) dataset. So the next steps are specifically intended to preparing this dataset.
 * Example for preparing the (original) FairytaleQA dataset:
 1.  Create `FairytaleQA_Dataset` folder inside `data` folder
 2.  Download the files and folders from [here](https://github.com/WorkInTheDark/FairytaleQA_Dataset/tree/main/FairytaleQA_Dataset_Sentence_Split) and place them inside `data/FairytaleQA_Dataset` folder
@@ -123,7 +123,10 @@ Current experiments use the [FairytaleQA](https://aclanthology.org/2022.acl-long
 
 2. In the end, predictions will be available at `predictions/checkpoint-name`. The folder contains model predictions (`predictions.json`), and parameters (`params.json`).
 
-**Note**: You can change encoder_info parameter (answertype_text, skill_answertype_text) according to control preferences.
+**Note**: You can change *encoder_info* parameter as follows:
+   - skill_text: control question narrative elements
+   - answertype_text: control question explicitness
+   - skill_answertype_text: control question explicitness and narrative elements (same time)
 
 ### Inference: Example for question **narrative/skill**
 Go to `src/model`. The script file `inference_qg_t5_base_512_128_32_10_skill-text_question-answer_seed_44.sh` is an example for the inference routine.
@@ -142,7 +145,7 @@ Go to `src/model`. The script file `inference_qg_t5_base_512_128_32_10_skill-tex
 2.  Go to `src/eval-qg.py` file
 3.  See **preds_path** list and choose (remove or add) additional predictions. Current predictions are the ones reported in the article
 4.  Run `src/eval-qg.py` to computer evaluation scores
-**Note**: Our experiments showed that BLEURT took too long to compute the scores. For these reasons, we have commented out the computation and output of BLEURT values in the code. If you still want to compute BLEURT, update **bleurt_checkpoint** and uncomment the BLEURT lines.
+**Note**: Our experiments showed that BLEURT took too long to compute the scores. For these reasons, we have commented on the code's computation and output of BLEURT values. If you still want to compute BLEURT, update ***bleurt_checkpoint*** and uncomment the BLEURT lines.
 
 ### Evaluation (Question Answering)
 1.  For QA evaluation, you first need to install/configure [Rouge](https://github.com/google-research/google-research/tree/master/rouge)
