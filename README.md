@@ -1,7 +1,7 @@
 # Towards Enriched Controllability for Educational Question Generation
 ===============
 
-Sample source code and models for our [AIED 2023](https://www.aied2023.org/accepted_papers.html) paper: [Towards Enriched Controllability for Educational Question Generation](https://www.aied2023.org/accepted_papers.html)
+Sample source code and models for our [AIED 2023](https://www.aied2023.org/) paper: [Towards Enriched Controllability for Educational Question Generation](https://link.springer.com/chapter/10.1007/978-3-031-36272-9_72)
 
 **Abstract:** Question Generation (QG) is a task within Natural Language Processing (NLP) that involves automatically generating questions given an input, typically composed of a text and a target answer. Recent work on QG aims to control the type of generated questions so that they meet educational needs. A remarkable example of controllability in educational QG is the generation of questions underlying certain narrative elements, e.g., causal relationship, outcome resolution, or prediction. This study aims to enrich controllability in QG by introducing a new guidance attribute: question explicitness. We propose to control the generation of explicit and implicit wh-questions from children-friendly stories. We show preliminary evidence of controlling QG via question explicitness alone and simultaneously with another target attribute: the question's narrative element.
 
