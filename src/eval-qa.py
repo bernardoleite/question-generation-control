@@ -277,8 +277,10 @@ def compute_qa_scores(gens_refs):
 
     for elem in gens_refs:
         attribute_name = list(elem.keys())[0]
+
         gens_refs = list(elem.values())[0]
         gens = gens_refs[0]
+
         refs = gens_refs[1]
         refs_flat = gens_refs[2]
 
@@ -300,18 +302,22 @@ if __name__ == '__main__':
     # Initialize the Parser
     parser = argparse.ArgumentParser(description = 'Evaluation script fo QA.')
 
-    #preds_path = [
-    #"../predictions/t5-base/qa_t5_base_512_128_32_10_question-text_answer_seed_44/model-epoch=02-val_loss=0.67/",
-    #"../predictions/t5-large/qa_t5_large_512_128_8_10_question-text_answer_seed_45/model-epoch=00-val_loss=0.58/",
-    #]
-
     preds_path = [
-    #"../predictions/t5-base/qa_questiongen_t5_base_512_128_32_10_answertype-text_question-answer_seed_44/model-epoch=04-val_loss=0.99/",
-    #"../predictions/t5-base/qa_questiongen_t5_base_512_128_32_10_skill-answertype-text_question-answer_seed_44/model-epoch=04-val_loss=0.95/",
-    "../predictions/t5-large/qa_questiongen_t5_large_512_128_8_10_answertype-text_question-answer_seed_45/model-epoch=01-val_loss=0.91/",
-    "../predictions/t5-large/qa_questiongen_t5_large_512_128_8_10_skill-answertype-text_question-answer_seed_45/model-epoch=01-val_loss=0.86/",
-    "../predictions/gpt3/qa_questiongen_gpt3_ctrl_a_same/",
+    #"../predictions/t5-large/qa_t5_large_512_128_8_10_question-text_answer_seed_45/model-epoch=00-val_loss=0.58/"
+    #"../predictions/t5-large/qa_questiongen_t5_large_512_128_8_10_answer-text_question-answer_seed_45/model-epoch=01-val_loss=0.91/",
+
+    #"../predictions/t5-large/qa_questiongen_t5_large_512_128_8_10_answertype-text_question-answer_seed_45/model-epoch=01-val_loss=0.91/",
+    #"../predictions/t5-large/qa_questiongen_t5_large_512_128_8_10_skill-answertype-text_question-answer_seed_45/model-epoch=01-val_loss=0.86/",
+
+    #"../predictions/gpt3/qa_questiongen_gpt3_ctrl_a_same/",
+    "../predictions/gpt3/qa_questiongen_gpt3_ctrl_sk_a_1_example/",
+    "../predictions/gpt3/qa_questiongen_gpt3_ctrl_sk_a_3_example/",
     "../predictions/gpt3/qa_questiongen_gpt3_ctrl_sk_a/",
+    "../predictions/gpt3/qa_questiongen_gpt3_ctrl_sk_a_7_example/",
+    #"../predictions/gpt3/qa_questiongen_gpt3_gpt3_ctrl_a_same/",
+    #"../predictions/gpt3/qa_questiongen_gpt3_gpt3_ctrl_sk_a/",
+    #"../predictions/gpt3/qa_questiongen_gpt3_t5_ctrl_a_same/",
+    #"../predictions/gpt3/qa_questiongen_gpt3_t5_ctrl_sk_a/",
     ]
 
     # Add arguments
