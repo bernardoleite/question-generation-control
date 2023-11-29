@@ -12,6 +12,11 @@ from statistics import mean
 #from bert_score import score
 from bleurt import score
 
+from pinc import PINCscore
+
+from self_bleu import SelfBleu
+from metrics import Metrics
+
 import evaluate
 from evaluate import load
 
@@ -19,6 +24,7 @@ from collections import Counter
 from nltk import ngrams
 
 import itertools
+import random
 
 from language_tool_python import LanguageTool
 
@@ -121,10 +127,13 @@ def get_bert_score(references, predictions, lower_case=False, language="english"
     return mean_all_bert_score_f1
 
 def get_bleurt_score(references, predictions, lower_case=False, language="english"):
-    bleurt_checkpoint = "PATH_TO_BLEURT/bleurt-master/bleurt/BLEURT-20" #update this
+    bleurt_checkpoint = "F:/bleurt-master/bleurt-master/bleurt/BLEURT-20" #update this
 
     list_of_references = []
     scorer = score.BleurtScorer(bleurt_checkpoint)
+
+    #predictions = random.sample(predictions, 5)
+    #references = random.sample(references, 5)
 
     for index, ref_group in enumerate(references):
         refs_bertscore = []
@@ -134,7 +143,7 @@ def get_bleurt_score(references, predictions, lower_case=False, language="englis
             scores = scorer.score(references=[ref], candidates=[candidate])
             assert isinstance(scores, list) and len(scores) == 1
             refs_bertscore.append(scores[0])
-        #print(index, refs_bertscore)
+        print(index, refs_bertscore)
         best_bertscore_f1 = max(refs_bertscore)
         idx_best_bertscore_f1 = refs_bertscore.index(best_bertscore_f1)
         chosen_ref = ref_group[idx_best_bertscore_f1]
@@ -142,8 +151,8 @@ def get_bleurt_score(references, predictions, lower_case=False, language="englis
     
 
     all_scores = scorer.score(references=list_of_references, candidates=predictions)
-    #with open('bleurt_answertype-text_question-answer.json', 'w') as f:
-        #json.dump(all_scores, f)
+    with open('bleurt_gpt3_ctrl_sk_a.json', 'w') as f:
+        json.dump(all_scores, f)
 
     return mean(all_scores)
 
@@ -177,7 +186,51 @@ def get_distinct_n_score(predictions, n):
         distinct_n_score = calc_distinct_n_score(pred, n)
         all_distinct_scores.append(distinct_n_score)
 
+    with open('dist3_answers_gpt3_ctrl_sk_a.json', 'w') as f:
+        json.dump(all_distinct_scores, f)
+
     return mean(all_distinct_scores)
+
+def get_pinc_score(predictions, max_n_gram=3):
+    # Create a PINC scorer with the desired max_n_gram
+    pinc_scorer = PINCscore(max_n_gram)
+
+    # Lists to store contexts and questions
+    contexts = []
+    questions = []
+
+    # Iterate through instances
+    for instance in predictions:
+        # Concatenate sections_texts to create the context
+        context = ' '.join(instance['sections_texts'])
+
+        # Save the generated question
+        question = instance['gen_question']
+
+        # Append context and question to their respective lists
+        contexts.append(context)
+        questions.append(question)
+
+    # Calculate PINC scores
+    pinc_scores = pinc_scorer.score(contexts, questions)
+
+    return mean(pinc_scores)
+
+def get_self_bleu_score(predictions, n=3):
+    # Write questions to questions_tmp.txt
+    with open('questions_tmp.txt', 'w', encoding='utf-8') as txt_file:
+        for prediction in predictions:
+                txt_file.write(prediction + '\n')
+
+    self_bleu = SelfBleu(test_text='questions_tmp.txt', gram=n)
+
+    self_bleu_score_fast = self_bleu.get_bleu_fast()
+    #print("Self-BLEU (Fast):", self_bleu_score_fast)
+
+    #self_bleu_score_parallel = self_bleu.get_bleu_parallel()
+    #print("Self-BLEU (Parallel):", self_bleu_score_parallel)
+
+    return self_bleu_score_fast
 
 def get_grammar_error_score(predictions):
     tool = LanguageTool('en-US')  # Specify the language ('en-US' for American English)
@@ -188,13 +241,59 @@ def get_grammar_error_score(predictions):
         filtered_matches = [match for match in matches if match.ruleId != 'MORFOLOGIK_RULE_EN_US']
         total_errors += len(filtered_matches)  # Count the number of errors in the sentence
 
-        #if len(filtered_matches) > 0:
-            #print(filtered_matches)
-            #print("\n")
+        if len(filtered_matches) > 0:
+            print(filtered_matches)
+            print(sentence)
+            print("\n")
 
     average_errors = total_errors / len(predictions)
 
     return average_errors
+
+def compute_rouge_by_nar(predictions):
+
+    predictions_character = list(filter(lambda d: d['attributes'][0] in ["character"], predictions))
+    predictions_setting = list(filter(lambda d: d['attributes'][0] in ["setting"], predictions))
+    predictions_action = list(filter(lambda d: d['attributes'][0] in ["action"], predictions))
+    predictions_feeling = list(filter(lambda d: d['attributes'][0] in ["feeling"], predictions))
+    predictions_causal = list(filter(lambda d: d['attributes'][0] in ["causal"], predictions))
+    predictions_outcome = list(filter(lambda d: d['attributes'][0] in ["outcome"], predictions))
+    predictions_prediction = list(filter(lambda d: d['attributes'][0] in ["prediction"], predictions))
+
+    references_character = [ref['questions_reference'] for ref in predictions_character]
+    predictions_character = [pred['gen_question'] for pred in predictions_character]
+    rouge_scores =  get_rouge_option_rouge_scorer(references_character, predictions_character, lower_case=True, language=args.language)
+    print("Mean rouge_scorer CHARACTER: ", round(rouge_scores['f'],3))
+
+    references_setting = [ref['questions_reference'] for ref in predictions_setting]
+    predictions_setting = [pred['gen_question'] for pred in predictions_setting]
+    rouge_scores =  get_rouge_option_rouge_scorer(references_setting, predictions_setting, lower_case=True, language=args.language)
+    print("Mean rouge_scorer SETTING: ", round(rouge_scores['f'],3))
+
+    references_action = [ref['questions_reference'] for ref in predictions_action]
+    predictions_action = [pred['gen_question'] for pred in predictions_action]
+    rouge_scores =  get_rouge_option_rouge_scorer(references_action, predictions_action, lower_case=True, language=args.language)
+    print("Mean rouge_scorer ACTION: ", round(rouge_scores['f'],3))
+
+    references_feeling = [ref['questions_reference'] for ref in predictions_feeling]
+    predictions_feeling = [pred['gen_question'] for pred in predictions_feeling]
+    rouge_scores =  get_rouge_option_rouge_scorer(references_feeling, predictions_feeling, lower_case=True, language=args.language)
+    print("Mean rouge_scorer FEELING: ", round(rouge_scores['f'],3))
+
+    references_causal = [ref['questions_reference'] for ref in predictions_causal]
+    predictions_causal = [pred['gen_question'] for pred in predictions_causal]
+    rouge_scores =  get_rouge_option_rouge_scorer(references_causal, predictions_causal, lower_case=True, language=args.language)
+    print("Mean rouge_scorer CAUSAL: ", round(rouge_scores['f'],3))
+
+    references_outcome = [ref['questions_reference'] for ref in predictions_outcome]
+    predictions_outcome = [pred['gen_question'] for pred in predictions_outcome]
+    rouge_scores =  get_rouge_option_rouge_scorer(references_outcome, predictions_outcome, lower_case=True, language=args.language)
+    print("Mean rouge_scorer OUTCOME: ", round(rouge_scores['f'],3))
+
+    references_prediction = [ref['questions_reference'] for ref in predictions_prediction]
+    predictions_prediction = [pred['gen_question'] for pred in predictions_prediction]
+    rouge_scores =  get_rouge_option_rouge_scorer(references_prediction, predictions_prediction, lower_case=True, language=args.language)
+    print("Mean rouge_scorer PREDICTION: ", round(rouge_scores['f'],3))
 
 def run(args, preds_path):
 
@@ -204,20 +303,22 @@ def run(args, preds_path):
 
         # Read predictions file
         with open(pred_path + "predictions.json") as file:
-            predictions = json.load(file)
+            predictions_all = json.load(file)
+
+        #compute_rouge_by_nar(predictions)
         
-        references = [ref['questions_reference'] for ref in predictions]
-        predictions_answers = [pred['gen_answer'] for pred in predictions]
-        predictions = [pred['gen_question'] for pred in predictions]
+        references = [ref['questions_reference'] for ref in predictions_all]
+        predictions_answers = [pred['gen_answer'] for pred in predictions_all]
+        predictions = [pred['gen_question'] for pred in predictions_all]
 
         references_flat = list(itertools.chain.from_iterable(references))
 
         # Get BLEU (results are the same as reported from Du et. al (2017))
-        score_corpus_bleu = get_corpus_bleu(references, predictions, lower_case=False, language=args.language)
-        print("Score Corpus Bleu: ", round(score_corpus_bleu['Bleu_4'],3))
+        #score_corpus_bleu = get_corpus_bleu(references, predictions, lower_case=False, language=args.language)
+        #print("Score Corpus Bleu: ", round(score_corpus_bleu['Bleu_4'],3))
 
-        rouge_scores =  get_rouge_option_rouge_scorer(references, predictions, lower_case=True, language=args.language)
-        print("Mean rouge_scorer: ", round(rouge_scores['f'],3))
+        #rouge_scores =  get_rouge_option_rouge_scorer(references, predictions, lower_case=True, language=args.language)
+        #print("Mean rouge_scorer: ", round(rouge_scores['f'],3))
 
         #bert_score = get_bert_score(references, predictions, lower_case=True, language=args.language)
         #print("Mean BERT_score: ", bert_score)
@@ -225,8 +326,8 @@ def run(args, preds_path):
         #bleurt_score = get_bleurt_score(references, predictions, lower_case=True, language=args.language)
         #print("Mean BLEURT_score: ", bleurt_score)
 
-        ppl_score_references = get_ppl_score(references_flat, lower_case=False, language=args.language)
-        print("Mean Perplexity score (references): ", ppl_score_references["mean_perplexity"])
+        #ppl_score_references = get_ppl_score(references_flat, lower_case=False, language=args.language)
+        #print("Mean Perplexity score (references): ", ppl_score_references["mean_perplexity"])
 
         #
         # Linguistic Quality for QUESTIONS #
@@ -236,7 +337,13 @@ def run(args, preds_path):
         #print("Mean Perplexity score (predictions): ", round(ppl_score_predictions["mean_perplexity"],3))
 
         #distinct_score = get_distinct_n_score(predictions, 3)
-        #print("Mean Distinct-3 score: ", round(distinct_score,3))
+        #print("Mean Distinct-3 score: ", round(distinct_score, 3))
+
+        #pinc_score = get_pinc_score(predictions_all, 3)
+        #print("Mean PINC score: ", round(pinc_score, 3))
+
+        self_bleu_score  = get_self_bleu_score(predictions, 3)
+        print("Mean Self-Bleu score: ", round(self_bleu_score, 3))
 
         #grammar_error_score_preds = get_grammar_error_score(predictions)
         #print("Avg. Grammar Error score (predictions): ", round(grammar_error_score_preds,3))
@@ -245,14 +352,14 @@ def run(args, preds_path):
         # Linguistic Quality for ANSWERS #
         #
 
-        ppl_score_predictions = get_ppl_score(predictions_answers, lower_case=False, language=args.language)
-        print("Mean Perplexity score (predictions): ", round(ppl_score_predictions["mean_perplexity"],3))
+        #ppl_score_predictions = get_ppl_score(predictions_answers, lower_case=False, language=args.language)
+        #print("Mean Perplexity score (predictions): ", round(ppl_score_predictions["mean_perplexity"],3))
 
-        distinct_score = get_distinct_n_score(predictions_answers, 3)
-        print("Mean Distinct-3 score: ", round(distinct_score,3))
+        #distinct_score = get_distinct_n_score(predictions_answers, 3)
+        #print("Mean Distinct-3 score: ", round(distinct_score,3))
 
-        grammar_error_score_preds = get_grammar_error_score(predictions_answers)
-        print("Avg. Grammar Error score (predictions): ", round(grammar_error_score_preds,3))
+        #grammar_error_score_preds = get_grammar_error_score(predictions_answers)
+        #print("Avg. Grammar Error score (predictions): ", round(grammar_error_score_preds,3))
 
         print("\n\n")
 
@@ -271,10 +378,16 @@ if __name__ == '__main__':
     "../predictions/t5-large/qg_t5_large_512_128_8_10_skill-text_question-answer_seed_45/model-epoch=00-val_loss=0.85/",
     "../predictions/t5-large/qg_t5_large_512_128_8_10_skill-answertype-text_question-answer_seed_45/model-epoch=01-val_loss=0.86/",
 
+    #"../predictions/gpt3/gpt3_ctrl_text_1_example/",
+    #"../predictions/gpt3/gpt3_ctrl_text_3_example/",
     "../predictions/gpt3/gpt3_ctrl_text/",
+    #"../predictions/gpt3/gpt3_ctrl_text_7_example/",
     "../predictions/gpt3/gpt3_ctrl_a_same/",
     "../predictions/gpt3/gpt3_ctrl_sk/",
-    "../predictions/gpt3/gpt3_ctrl_sk_a/"
+    #"../predictions/gpt3/gpt3_ctrl_sk_a_1_example/",
+    #"../predictions/gpt3/gpt3_ctrl_sk_a_3_example/",
+    "../predictions/gpt3/gpt3_ctrl_sk_a/",
+    #"../predictions/gpt3/gpt3_ctrl_sk_a_7_example/"
 
     ]
 
