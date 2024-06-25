@@ -81,8 +81,7 @@ Current experiments use the [FairytaleQA](https://aclanthology.org/2022.acl-long
     done
     ```
 
-2. In the end, predictions will be available at `predictions/checkpoint-name`. The folder contains model predictions (`predictions.json`), and parameters (`params.json`).
-
+2. In the end, model checkpoints will be available at `checkpoints/checkpoint-name`.
 
 ### Training: Example for question **explicitness/answertype** control
 1.  Go to `src/model`. The file `train.py` is responsible for the training routine. Type the following command to read the description of the parameters:
@@ -121,7 +120,7 @@ Current experiments use the [FairytaleQA](https://aclanthology.org/2022.acl-long
     done
     ```
 
-2. In the end, predictions will be available at `predictions/checkpoint-name`. The folder contains model predictions (`predictions.json`), and parameters (`params.json`).
+2. In the end, model checkpoints will be available at `checkpoints/checkpoint-name`.
 
 **Note**: You can change *encoder_info* parameter as follows:
    - skill_text: control question narrative elements
@@ -129,7 +128,7 @@ Current experiments use the [FairytaleQA](https://aclanthology.org/2022.acl-long
    - skill_answertype_text: control question explicitness and narrative elements (same time)
 
 ### Inference: Example for question **narrative/skill**
-Go to `src/model`. The script file `inference_qg_t5_base_512_128_32_10_skill-text_question-answer_seed_44.sh` is an example for the inference routine.
+Go to `src/model`. The script file `inference_qg_t5_base_512_128_32_10_skill-text_question-answer_seed_44.sh` is an example for the inference routine. The predictions will be available at `predictions/checkpoint-name`. The folder contains model predictions (`predictions.json`), and parameters (`params.json`).
 
 **Important note**: Replace **XX** and **YY** according to epoch number and loss from checkpoint_model_path and predictions_save_path parameters.
 
